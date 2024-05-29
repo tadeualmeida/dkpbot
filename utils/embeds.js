@@ -20,7 +20,7 @@ function createMultipleResultsEmbed(color, title, descriptions) {
         .setTitle(title)
         .setTimestamp();
 
-    const maxLinesPerField = 40;
+    const maxLinesPerField = 30;
     const maxFieldLength = 1024;
 
     let currentFieldLines = [];
