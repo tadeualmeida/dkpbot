@@ -30,7 +30,7 @@ function createMultipleResultsEmbed(color, title, descriptions) {
         // Se adicionar esta linha exceder o limite de caracteres ou de linhas, cria um novo campo
         if ((currentFieldLines.join('\n').length + desc.length > maxFieldLength) || currentFieldLines.length >= maxLinesPerField) {
             //embed.addFields({ name: `Details ${fieldCount + 1}`, value: currentFieldLines.join('\n'), inline: true });
-            embed.addFields({ name: '\u200B', value: currentFieldLines.join('\n'), inline: false });
+            embed.addFields({ name: '\u200B', value: currentFieldLines.join('\n'), inline: true });
             currentFieldLines = [];
             fieldCount++;
         }
