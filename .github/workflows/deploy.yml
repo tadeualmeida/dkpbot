@@ -20,7 +20,7 @@ jobs:
 
     - name: Deploy to EC2
       run: |
-        ssh -o StrictHostKeyChecking=no ubuntu@ec2-54-207-39-201.sa-east-1.compute.amazonaws.com << 'EOF'
+        ssh -i ubuntu@ec2-54-207-39-201.sa-east-1.compute.amazonaws.com << 'EOF'
         cd /home/ubuntu/dkpbot
         git pull origin main
         npm install
