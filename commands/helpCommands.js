@@ -2,15 +2,15 @@ const { createInfoEmbed } = require('../utils/embeds');
 
 const commandCategories = {
     General: [
-        { name: '/help', description: 'Lists all available commands and what each one does.', permissions: 'Everyone' },
-        { name: '/bank', description: 'Shows the amount of crows in the guild bank.', permissions: 'Everyone' },
+        { name: '/help', description: 'Lists all available commands and what each one does.', permissions: 'Members' },
+        { name: '/bank', description: 'Shows the amount of crows in the guild bank.', permissions: 'Members' },
         { name: '/reset', description: 'Resets all DKP points, events, and crows for the guild.', permissions: 'Administrators' },
     ],
     DKP: [
-        { name: '/dkp', description: 'List your own DKP.', permissions: 'Everyone' },
+        { name: '/dkp', description: 'List your own DKP.', permissions: 'Members' },
         { name: '/dkp add <users> <points>', description: 'Adds DKP points to one or more users.', permissions: 'Administrators, Moderators' },
         { name: '/dkp remove <users> <points>', description: 'Removes DKP points from one or more users.', permissions: 'Administrators, Moderators' },
-        { name: '/rank', description: 'Shows the guild DKP rank.', permissions: 'Everyone' },
+        { name: '/rank', description: 'Shows the guild DKP rank.', permissions: 'Members' },
     ],
     Configuration: [
         { name: '/config dkp <action> <name> <points>', description: 'Manages DKP parameters.', permissions: 'Administrators' },
@@ -20,7 +20,7 @@ const commandCategories = {
     Event: [
         { name: '/event start <parameter>', description: 'Starts an event with the specified parameter.', permissions: 'Administrators, Moderators' },
         { name: '/event end <code>', description: 'Ends the event with the specified code.', permissions: 'Administrators, Moderators' },
-        { name: '/join <code>', description: 'Joins the event with the specified code.', permissions: 'Everyone' },
+        { name: '/join <code>', description: 'Joins the event with the specified code.', permissions: 'Members' },
     ],
 };
 

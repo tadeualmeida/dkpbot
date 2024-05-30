@@ -12,9 +12,9 @@ const configCommand = new SlashCommandBuilder()
                     .setDescription('The command group to set the role for.')
                     .setRequired(true)
                     .addChoices(
-                        { name: 'Users', value: 'users' },
-                        { name: 'Administrator', value: 'administrators' },
-                        { name: 'Moderator', value: 'moderators' }
+                        { name: 'Members', value: 'users' },
+                        { name: 'Administrators', value: 'administrators' },
+                        { name: 'Moderators', value: 'moderators' }
                     ))
             .addRoleOption(option =>
                 option.setName('role')
