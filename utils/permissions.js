@@ -13,7 +13,6 @@ async function checkRolePermission(interaction, commandName) {
         if (!hasRole) return false;
 
         if (config.commandGroup === 'administrators' && ['setrole'].includes(commandName)) return false;
-       // if (config.commandGroup === 'moderators' && ['eventstart', 'eventend'].includes(commandName)) return true;
         if (config.commandGroup === 'moderators' && ['addcrow', 'removecrow', 'config', 'channel', 'reset'].includes(commandName)) return false;
         if (config.commandGroup === 'users' && !['bank', 'dkp', 'rank', 'join', 'help'].includes(commandName)) return false;
 

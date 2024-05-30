@@ -45,7 +45,7 @@ const configCommand = new SlashCommandBuilder()
 
     .addSubcommand(subcommand =>
         subcommand.setName('channel')
-            .setDescription('Manage channels for bot messages.')
+            .setDescription('Manage channels for bot data messages.')
             .addStringOption(option =>
                 option.setName('action')
                     .setDescription('Add or remove channels.')
