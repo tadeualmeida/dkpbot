@@ -48,6 +48,7 @@ async function executeCommand(interaction) {
                 await handleResetCommand(interaction);
                 break;
             case 'help':
+            case 'showhelp':
                 await handleHelpCommand(interaction);
                 break;
             default:

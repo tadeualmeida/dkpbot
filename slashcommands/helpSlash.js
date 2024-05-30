@@ -5,8 +5,12 @@ const helpCommand = new SlashCommandBuilder()
     .setDescription('Lists all available commands and what each one does.')
     .addStringOption(option =>
         option.setName('command')
-            .setDescription('Specify a command to get detailed information.')
+            .setDescription('The specific command to get detailed help about')
             .setRequired(false)
     );
 
-module.exports = { helpCommand };
+const showHelpCommand = new SlashCommandBuilder()
+    .setName('showhelp')
+    .setDescription('Lists all available commands and what each one does for everyone.');
+
+module.exports = { helpCommand, showHelpCommand };

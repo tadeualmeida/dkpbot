@@ -3,6 +3,7 @@ const { createInfoEmbed } = require('../utils/embeds');
 const commandCategories = {
     General: [
         { name: '/help', description: 'Lists all available commands and what each one does.', permissions: 'Members', examples: ['/help', '/help dkp'] },
+        { name: '/showhelp', description: 'Shows to everyone in the current channel all available commands', permissions: 'Administrators, Moderators', examples: ['/showhelp'] },
         { name: '/bank', description: 'Shows the amount of crows in the guild bank.', permissions: 'Members', examples: ['/bank'] },
         { name: '/reset', description: 'Resets all DKP points, events, and crows for the guild.', permissions: 'Administrators', examples: ['/reset'] },
     ],
@@ -31,7 +32,7 @@ async function handleHelpCommand(interaction) {
         const detailedInfo = getDetailedCommandInfo(commandName);
         if (detailedInfo) {
             const embed = createInfoEmbed(`Help: ${commandName}`, detailedInfo);
-            await interaction.reply({ embeds: [embed] });
+            await interaction.reply({ embeds: [embed], ephemeral: true });
         } else {
             await interaction.reply({ content: 'Command not found.', ephemeral: true });
         }
@@ -44,8 +45,20 @@ async function handleHelpCommand(interaction) {
         }).join('\n\n');
 
         const embed = createInfoEmbed('Available Commands', descriptions);
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed], ephemeral: true });
     }
+}
+
+async function handleShowHelpCommand(interaction) {
+    const descriptions = Object.entries(commandCategories).map(([category, commands]) => {
+        const commandsList = commands.map(command => 
+            `**${command.name}** - ${command.description} (Permissions: ${command.permissions})`
+        ).join('\n');
+        return `**${category} Commands:**\n${commandsList}`;
+    }).join('\n\n');
+
+    const embed = createInfoEmbed('Available Commands', descriptions);
+    await interaction.reply({ embeds: [embed] });
 }
 
 function getDetailedCommandInfo(commandName) {
@@ -62,4 +75,4 @@ function getDetailedCommandInfo(commandName) {
     return null;
 }
 
-module.exports = { handleHelpCommand };
+module.exports = { handleHelpCommand, handleShowHelpCommand };
