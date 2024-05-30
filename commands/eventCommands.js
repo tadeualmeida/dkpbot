@@ -8,7 +8,7 @@ const {
 } = require('../utils/embeds');
 const Event = require('../schema/Event');
 const { getDkpParameterFromCache } = require('../utils/cacheManagement');
-const { generateRandomCode } = require('../utils/codegenerator');
+const { generateRandomCode } = require('../utils/codeGenerator');
 const schedule = require('node-schedule'); 
 const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
 const ChannelConfig = require('../schema/ChannelConfig');
