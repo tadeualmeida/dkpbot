@@ -4,7 +4,7 @@ const { handleSetRoleCommand } = require('./roleCommands');
 const { handleEventCommands } = require('./eventCommands');
 const { handleResetCommand } = require('./resetCommands');
 const { checkRolePermission } = require('../utils/permissions');
-const { handleHelpCommand } = require('./helpCommands');
+const { handleHelpCommand, handleShowHelpCommand } = require('./helpCommands');
 
 
 async function executeCommand(interaction) {
@@ -48,8 +48,9 @@ async function executeCommand(interaction) {
                 await handleResetCommand(interaction);
                 break;
             case 'help':
-            case 'showhelp':
                 await handleHelpCommand(interaction);
+            case 'showhelp':
+                await handleShowHelpCommand(interaction);
                 break;
             default:
                 await interaction.reply({ content: "This command is not recognized.", ephemeral: true });
