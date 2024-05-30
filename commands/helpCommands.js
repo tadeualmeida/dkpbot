@@ -15,7 +15,7 @@ const commandCategories = {
     Configuration: [
         { name: '/config dkp <action> <name> <points>', description: 'Manages DKP parameters.', permissions: 'Administrators' },
         { name: '/config role <role> <commandGroup>', description: 'Sets role permissions for command groups.', permissions: 'Administrators' },
-        { name: '/config channel <action> <channel>', description: 'Manages channels for bot messages.', permissions: 'Administrators' },
+        { name: '/config channel <action> <channel>', description: 'Manages channels for bot data messages.', permissions: 'Administrators' },
     ],
     Event: [
         { name: '/event start <parameter>', description: 'Starts an event with the specified parameter.', permissions: 'Administrators, Moderators' },
