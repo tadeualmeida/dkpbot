@@ -25,16 +25,38 @@ const commandCategories = {
 };
 
 async function handleHelpCommand(interaction) {
-    const descriptions = Object.entries(commandCategories).map(([category, commands]) => {
-        const commandsList = commands.map(command => 
-            `**${command.name}** - ${command.description} (Permissions: ${command.permissions})`
-        ).join('\n');
-        return `**${category} Commands:**\n${commandsList}`;
-    }).join('\n\n');
+    const commandName = interaction.options.getString('command');
+    
+    if (commandName) {
+        const detailedInfo = getDetailedCommandInfo(commandName);
+        if (detailedInfo) {
+            const embed = createInfoEmbed(`Help: ${commandName}`, detailedInfo);
+            await interaction.reply({ embeds: [embed] });
+        } else {
+            await interaction.reply({ content: 'Command not found.', ephemeral: true });
+        }
+    } else {
+        const descriptions = Object.entries(commandCategories).map(([category, commands]) => {
+            const commandsList = commands.map(command => 
+                `**${command.name}** - ${command.description} (Permissions: ${command.permissions})`
+            ).join('\n');
+            return `**${category} Commands:**\n${commandsList}`;
+        }).join('\n\n');
+    
+        const embed = createInfoEmbed('Available Commands', descriptions);
+        await interaction.reply({ embeds: [embed] });
+    }
+}
 
-    const embed = createInfoEmbed('Available Commands', descriptions);
-
-    await interaction.reply({ embeds: [embed] });
+function getDetailedCommandInfo(commandName) {
+    for (const commands of Object.values(commandCategories)) {
+        for (const command of commands) {
+            if (command.name.split(' ')[0] === commandName.split(' ')[0]) {
+                return `**Command:** ${command.name}\n**Description:** ${command.description}\n**Permissions:** ${command.permissions}\n**Usage Examples:**\n\`\`\`${command.name.split(' ')[0]} example usage...\`\`\``;
+            }
+        }
+    }
+    return null;
 }
 
 module.exports = { handleHelpCommand };
