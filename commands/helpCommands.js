@@ -52,7 +52,8 @@ function getDetailedCommandInfo(commandName) {
     const cleanCommandName = commandName.startsWith('/') ? commandName : `/${commandName}`;
     for (const commands of Object.values(commandCategories)) {
         for (const command of commands) {
-            if (command.name.split(' ')[0] === cleanCommandName.split(' ')[0]) {
+            if (command.name.split(' ')[0] === cleanCommandName.split(' ')[0] &&
+                command.name.includes(cleanCommandName.split(' ')[1] || '')) {
                 const examples = command.examples.map(example => `\`${example}\``).join('\n');
                 return `**Command:** ${command.name}\n**Description:** ${command.description}\n**Permissions:** ${command.permissions}\n**Usage Examples:**\n${examples}`;
             }
