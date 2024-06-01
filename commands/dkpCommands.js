@@ -4,6 +4,7 @@ const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const dkpCache = {};
+const validator = require('validator');
 
 async function handleDkpCommands(interaction) {
     const guildId = interaction.guildId;
@@ -37,7 +38,7 @@ async function handleDkpCommands(interaction) {
 async function handleDkpAddRemove(interaction, userId, guildId, isAdd) {
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');
-    const executingUser = interaction.user.username;
+    const executingUser = validator.escape(interaction.user.username);
 
     if (!userIDsInput) {
         await interaction.reply({ content: "You must specify at least one user ID.", ephemeral: true });
@@ -53,9 +54,9 @@ async function handleDkpAddRemove(interaction, userId, guildId, isAdd) {
         try {
             let userToModify;
             if (!userID.match(/^\d+$/)) {
-                userToModify = interaction.guild.members.cache.find(member => member.user.username === userID);
+                userToModify = interaction.guild.members.cache.find(member => validator.escape(member.user.username) === validator.escape(userID));
                 if (!userToModify) {
-                    descriptions.push(`User ${userID} not found.`);
+                    descriptions.push(`User ${validator.escape(userID)} not found.`);
                     continue;
                 }
                 userID = userToModify.user.id;
@@ -118,7 +119,7 @@ async function handleConfig(interaction, guildId) {
 async function handleConfigDkp(interaction, guildId) {
     const action = interaction.options.getString('action');
     if (action === 'add' || action === 'remove') {
-        const name = interaction.options.getString('name').toLowerCase();
+        const name = validator.escape(interaction.options.getString('name').toLowerCase());
         const parameter = await getDkpParameterFromCache(guildId, name);
         if (!parameter && action === 'remove') {
             await interaction.reply({ content: "Parameter not found.", ephemeral: true });
@@ -149,11 +150,6 @@ async function handleConfigDkp(interaction, guildId) {
 async function handleConfigChannel(interaction, guildId) {
     const action = interaction.options.getString('action');
     const channel = interaction.options.getChannel('channel');
-
-    //if (!channel) {
-    //    await interaction.reply({ content: 'You must specify a channel.', ephemeral: true });
-    //    return;
-    //}
 
     const existingConfig = await ChannelConfig.findOne({ guildId });
 

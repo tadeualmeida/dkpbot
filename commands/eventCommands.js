@@ -1,3 +1,4 @@
+const validator = require('validator');
 const {
     createEventStartedEmbed,
     createEventEndedEmbed,
@@ -9,7 +10,7 @@ const {
 const Event = require('../schema/Event');
 const { getDkpParameterFromCache } = require('../utils/cacheManagement');
 const { generateRandomCode } = require('../utils/codeGenerator');
-const schedule = require('node-schedule'); 
+const schedule = require('node-schedule');
 const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
 const ChannelConfig = require('../schema/ChannelConfig');
 
@@ -18,11 +19,11 @@ async function handleEventCommands(interaction) {
         case 'event':
             const subcommand = interaction.options.getSubcommand();
             if (subcommand === 'start') {
-            await startEvent(interaction);
+                await startEvent(interaction);
             } else if (subcommand === 'end') {
-            await endEvent(interaction);
+                await endEvent(interaction);
             } else if (subcommand === 'list') {
-            await listEvent(interaction);
+                await listEvent(interaction);
             }
             break;
         case 'join':
@@ -43,9 +44,8 @@ async function sendMessageToConfiguredChannels(interaction, description) {
     }
 }
 
-
 async function startEvent(interaction) {
-    const parameterName = interaction.options.getString('parameter');
+    const parameterName = validator.escape(interaction.options.getString('parameter'));
     const guildId = interaction.guildId;
     const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
 
@@ -91,9 +91,7 @@ async function startEvent(interaction) {
 }
 
 async function endEvent(interaction) {
-    const eventCodeToEnd = interaction.options.getString('code');
-    //const eventToEnd = await Event.findOne({ code: eventCodeToEnd, guildId });
-    //const event = await Event.findOne({ guildId, isActive: true });
+    const eventCodeToEnd = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
     const eventToEnd = await Event.findOne({ guildId: guildId, code: eventCodeToEnd, isActive: true });
     if (!eventToEnd || !eventToEnd.isActive) {
@@ -112,7 +110,7 @@ async function endEvent(interaction) {
 }
 
 async function joinEvent(interaction) {
-    const eventCode = interaction.options.getString('code');
+    const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
     const event = await Event.findOne({ guildId, code: eventCode, isActive: true });
 
@@ -129,7 +127,7 @@ async function joinEvent(interaction) {
     const dkpParameter = await getDkpParameterFromCache(guildId, event.parameterName);
 
     // Adiciona o ID do usuário como uma string simples
-    event.participants.push({ 
+    event.participants.push({
         userId: interaction.user.id,
         username: interaction.member ? interaction.member.displayName : 'N/A',
         discordUsername: `${interaction.user.username}`,
@@ -139,11 +137,13 @@ async function joinEvent(interaction) {
     // Atualiza o DKP do usuário
     const userDkp = await Dkp.findOneAndUpdate(
         { guildId: guildId, userId: interaction.user.id },
-        { $inc: { points: dkpParameter.points },
-          $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Joined event ${eventCode}` } }},
+        {
+            $inc: { points: dkpParameter.points },
+            $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Joined event ${eventCode}` } }
+        },
         { new: true, upsert: true }
     );
-    
+
     await event.save();
 
     if (dkpParameter.points !== 0) {
@@ -154,7 +154,7 @@ async function joinEvent(interaction) {
 }
 
 async function listEvent(interaction) {
-    const eventCode = interaction.options.getString('code');
+    const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
     const event = await Event.findOne({ guildId: guildId, code: eventCode });
 

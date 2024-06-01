@@ -1,6 +1,7 @@
 const { createCrowUpdateEmbed, createCrowBalanceEmbed } = require('../utils/embeds');
 const { addCrows, removeCrows, getCrows } = require('../utils/crowManager');
 const { DkpTotal } = require('../schema/Dkp');
+const validator = require('validator');
 
 async function handleCrowCommands(interaction) {
     const guildId = interaction.guildId;
@@ -8,13 +9,13 @@ async function handleCrowCommands(interaction) {
 
     switch (interaction.commandName) {
         case 'addcrow':
-            const amountToAdd = interaction.options.getInteger('amount');
-            if (amountToAdd <= 0) {
-                await interaction.editReply({ content: "The amount must be a positive number.", ephemeral: true });
+            let amountToAdd = interaction.options.getInteger('amount');
+            if (!validator.isInt(amountToAdd.toString(), { min: 1 })) {
+                await interaction.editReply({ content: "The amount must be a positive integer.", ephemeral: true });
                 return;
             }
             try {
-                const addedCrows = await addCrows(guildId, amountToAdd);
+                const addedCrows = await addCrows(guildId, parseInt(amountToAdd));
                 await interaction.editReply({ embeds: [createCrowUpdateEmbed(amountToAdd, addedCrows.crows)] });
             } catch (error) {
                 console.error('Error adding crows:', error);
@@ -22,13 +23,13 @@ async function handleCrowCommands(interaction) {
             }
             break;
         case 'removecrow':
-            const amountToRemove = interaction.options.getInteger('amount');
-            if (amountToRemove <= 0) {
-                await interaction.editReply({ content: "The amount must be a positive number.", ephemeral: true });
+            let amountToRemove = interaction.options.getInteger('amount');
+            if (!validator.isInt(amountToRemove.toString(), { min: 1 })) {
+                await interaction.editReply({ content: "The amount must be a positive integer.", ephemeral: true });
                 return;
             }
             try {
-                const removedCrows = await removeCrows(guildId, amountToRemove);
+                const removedCrows = await removeCrows(guildId, parseInt(amountToRemove));
                 if (removedCrows.crows < 0) {
                     await interaction.editReply({ content: "Insufficient crows in the bank.", ephemeral: true });
                     return;
@@ -42,7 +43,7 @@ async function handleCrowCommands(interaction) {
         case 'bank':
             try {
                 const crows = await getCrows(guildId);
-                const totalDkpResult = await DkpTotal.findOne({ guildId: guildId});
+                const totalDkpResult = await DkpTotal.findOne({ guildId: guildId });
                 const totalDkp = totalDkpResult ? totalDkpResult.totalDkp : 0;
                 await interaction.editReply({ embeds: [createCrowBalanceEmbed(crows, totalDkp)] });
             } catch (error) {
