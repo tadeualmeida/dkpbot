@@ -1,6 +1,6 @@
-const NodeCache = require("node-cache");
-const DkpParameter = require('../schema/DkParameter'); // Verifique o caminho
-const Dkp = require('../schema/Dkp'); // Adicione o modelo de DKP
+const NodeCache = require('node-cache');
+const DkpParameter = require('../schema/DkParameter');
+const Dkp = require('../schema/Dkp'); // Certifique-se de que o caminho está correto
 
 // Cria caches individuais para cada guilda
 const guildCaches = new Map();
@@ -50,7 +50,7 @@ function clearCache(guildId) {
 // Funções adicionais para gerenciar o cache de pontos DKP dos usuários
 async function refreshDkpPointsCache(guildId) {
     try {
-        const dkpPoints = await Dkp.findOne({ guildId: guildId });
+        const dkpPoints = await Dkp.find({ guildId: guildId });
         const guildCache = getGuildCache(guildId);
         dkpPoints.forEach(dkp => {
             guildCache.set(dkp.userId, dkp);
