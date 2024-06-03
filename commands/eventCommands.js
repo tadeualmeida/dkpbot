@@ -8,11 +8,14 @@ const {
     createInfoEmbed,
 } = require('../utils/embeds');
 const Event = require('../schema/Event');
-const { getDkpParameterFromCache, refreshDkpPointsCache } = require('../utils/cacheManagement'); // Adicionei refreshDkpPointsCache aqui
+const { getDkpParameterFromCache, refreshDkpPointsCache } = require('../utils/cacheManagement');
 const { generateRandomCode } = require('../utils/codeGenerator');
 const schedule = require('node-schedule');
 const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
 const ChannelConfig = require('../schema/ChannelConfig');
+
+// Mapa para armazenar os jobs agendados
+const scheduledJobs = new Map();
 
 async function handleEventCommands(interaction) {
     switch (interaction.commandName) {
@@ -72,7 +75,7 @@ async function startEvent(interaction) {
     await newEvent.save();
 
     // Agenda para tornar o evento inativo após 10 minutos
-    schedule.scheduleJob(Date.now() + 600000, async function() {
+    const job = schedule.scheduleJob(Date.now() + 600000, async function() {
         console.log(`Disabling event with code ${eventCode}.`);
         const eventToEnd = await Event.findOne({ guildId, code: eventCode, isActive: true });
         if (eventToEnd) {
@@ -85,7 +88,12 @@ async function startEvent(interaction) {
             await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after 10 minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
             await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
         }
+        // Remove o job do mapa
+        scheduledJobs.delete(eventCode);
     });
+
+    // Armazena o job agendado no mapa
+    scheduledJobs.set(eventCode, job);
 
     await interaction.reply({ embeds: [createEventStartedEmbed(parameterName, eventCode)], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.`);
@@ -109,6 +117,13 @@ async function endEvent(interaction) {
     await interaction.reply({ embeds: [createEventEndedEmbed()], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
     await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
+
+    // Cancela o job agendado para o evento
+    const job = scheduledJobs.get(eventCodeToEnd);
+    if (job) {
+        job.cancel();
+        scheduledJobs.delete(eventCodeToEnd);
+    }
 }
 
 async function joinEvent(interaction) {
