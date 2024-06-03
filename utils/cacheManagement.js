@@ -50,7 +50,7 @@ function clearCache(guildId) {
 // Funções adicionais para gerenciar o cache de pontos DKP dos usuários
 async function refreshDkpPointsCache(guildId) {
     try {
-        const dkpPoints = await Dkp.find({ guildId: guildId });
+        const dkpPoints = await Dkp.findOne({ guildId: guildId });
         const guildCache = getGuildCache(guildId);
         dkpPoints.forEach(dkp => {
             guildCache.set(dkp.userId, dkp);
