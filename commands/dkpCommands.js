@@ -6,7 +6,6 @@ const validator = require('validator');
 async function handleDkpCommands(interaction) {
     const guildId = interaction.guildId;
     const userId = interaction.user.id;
-
     const userDkp = await getDkpPointsFromCache(guildId, userId);
 
     switch (interaction.commandName) {
@@ -95,7 +94,7 @@ async function handleDkpRank(interaction, guildId) {
     try {
         const dkpPoints = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
         const descriptions = dkpPoints.map((dkp, index) => `${index + 1}. <@${dkp.userId}> - ${dkp.points} points`);
-        const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Ranking', descriptions);
+        const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Ranking - TOP 50', descriptions);
         await interaction.reply({ embeds: [resultsEmbed], ephemeral: true });
     } catch (error) {
         console.error('Failed to retrieve DKP rankings:', error);

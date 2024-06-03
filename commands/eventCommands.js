@@ -8,7 +8,7 @@ const {
     createInfoEmbed,
 } = require('../utils/embeds');
 const Event = require('../schema/Event');
-const { getDkpParameterFromCache } = require('../utils/cacheManagement');
+const { getDkpParameterFromCache, refreshDkpPointsCache } = require('../utils/cacheManagement'); // Adicionei refreshDkpPointsCache aqui
 const { generateRandomCode } = require('../utils/codeGenerator');
 const schedule = require('node-schedule');
 const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
@@ -71,7 +71,7 @@ async function startEvent(interaction) {
     });
     await newEvent.save();
 
-    // Agenda para tornar o evento inativo após 5 minutos
+    // Agenda para tornar o evento inativo após 10 minutos
     schedule.scheduleJob(Date.now() + 600000, async function() {
         console.log(`Disabling event with code ${eventCode}.`);
         const eventToEnd = await Event.findOne({ guildId, code: eventCode, isActive: true });
@@ -83,6 +83,7 @@ async function startEvent(interaction) {
             const participantCount = eventToEnd.participants.length;
 
             await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after 10 minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
+            await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
         }
     });
 
@@ -107,6 +108,7 @@ async function endEvent(interaction) {
 
     await interaction.reply({ embeds: [createEventEndedEmbed()], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
+    await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
 }
 
 async function joinEvent(interaction) {

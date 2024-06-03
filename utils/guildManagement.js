@@ -2,6 +2,10 @@ const schedule = require('node-schedule');
 const { Dkp, DkpTotal } = require('../schema/Dkp');
 const Event = require('../schema/Event');
 const { clearCache } = require('./cacheManagement');
+const DkpParameter = require('../schema/DkParameter');
+const ChannelConfig = require('../schema/ChannelConfig');
+const GuildBank = require('../schema/GuildBank');
+const RoleConfig = require('../schema/RoleConfig');
 
 const scheduledDeletions = new Map();
 
@@ -25,6 +29,10 @@ async function scheduleGuildDeletion(guildId) {
             await Dkp.deleteMany({ guildId: guildId });
             await DkpTotal.deleteMany({ guildId: guildId });
             await Event.deleteMany({ guildId: guildId });
+            await DkpParameter.deleteMany({ guildId: guildId });
+            await ChannelConfig.deleteMany({ guildId: guildId });
+            await GuildBank.deleteMany({ guildId: guildId });
+            await RoleConfig.deleteMany({ guildId: guildId });
             clearCache(guildId); // Limpa o cache para a guilda
             console.log(`Successfully deleted data for guild ${guildId}.`);
             scheduledDeletions.delete(guildId); // Remove a referência após a execução
