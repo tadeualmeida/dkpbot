@@ -20,7 +20,7 @@ async function refreshDkpParametersCache(guildId) {
         guildCache.flushAll();
         parameters.forEach(param => {
             if (param.name && param.points != null) {
-                guildCache.set(param.name, param);
+                guildCache.set(`dkpParameter:${param.name}`, param);
             }
         });
         console.log(`Cache de parâmetros DKP atualizado para a guilda ${guildId}.`);
@@ -31,11 +31,11 @@ async function refreshDkpParametersCache(guildId) {
 
 async function getDkpParameterFromCache(guildId, paramName) {
     const guildCache = getGuildCache(guildId);
-    let parameter = guildCache.get(paramName);
+    let parameter = guildCache.get(`dkpParameter:${paramName}`);
     if (!parameter) {
         parameter = await DkpParameter.findOne({ guildId: guildId, name: paramName });
         if (parameter) {
-            guildCache.set(paramName, parameter);
+            guildCache.set(`dkpParameter:${paramName}`, parameter);
         }
     }
     return parameter;

@@ -1,6 +1,6 @@
 const { checkRolePermission } = require('../utils/permissions');
 const { executeCommand } = require('../commands/executeCommand');
-const { getDkpParameterFromCache, getGuildCache, ParameterCache } = require('../utils/cacheManagement');
+const { getDkpParameterFromCache, getGuildCache } = require('../utils/cacheManagement');
 const Event = require('../schema/Event');  // Certifique-se de que o caminho está correto
 
 async function handleInteractionCreate(interaction) {
@@ -15,7 +15,9 @@ async function handleInteractionCreate(interaction) {
                     await interaction.respond([]);
                     return;
                 }
-                const allParameters = guildCache.keys().filter(key => key.toLowerCase().includes(search) && key.startsWith('dkpParameter:')).map(key => key.replace('dkpParameter:', ''));
+                const allParameters = guildCache.keys()
+                    .filter(key => key.startsWith('dkpParameter:') && key.toLowerCase().includes(search))
+                    .map(key => key.replace('dkpParameter:', ''));
                 const choices = allParameters.map(name => ({ name, value: name }));
                 await interaction.respond(choices.slice(0, 25));  // Responde com até 25 sugestões
                 return;
