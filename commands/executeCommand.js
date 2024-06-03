@@ -5,7 +5,7 @@ const { handleEventCommands } = require('./eventCommands');
 const { handleResetCommand } = require('./resetCommands');
 const { checkRolePermission } = require('../utils/permissions');
 const { handleHelpCommand, handleShowHelpCommand } = require('./helpCommands');
-
+const { handleConfigCommands } = require('./configCommands');
 
 async function executeCommand(interaction) {
     if (!await checkRolePermission(interaction, interaction.commandName)) {
@@ -17,7 +17,7 @@ async function executeCommand(interaction) {
         switch (subcommand) {
             case 'dkp':
             case 'channel':
-                await handleDkpCommands(interaction);
+                await handleConfigCommands(interaction);
                 break;
             case 'role':
                 await handleSetRoleCommand(interaction);
@@ -40,7 +40,6 @@ async function executeCommand(interaction) {
                 await handleCrowCommands(interaction);
                 break;
             case 'event':
-            //case 'eventend':
             case 'join':
                 await handleEventCommands(interaction);
                 break;
