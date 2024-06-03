@@ -1,6 +1,6 @@
 const { handleInteractionCreate } = require('./interactionCreate');
 const { registerCommands } = require('../utils/registerCommands');
-const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache } = require('../utils/cacheManagement');
+const { refreshDkpParametersCache, clearCache } = require('../utils/cacheManagement');
 const { clearEmptyEvents } = require('../utils/clearEmptyEvents');
 
 function setupEventHandlers(client) {
@@ -11,7 +11,6 @@ function setupEventHandlers(client) {
             clearCache(guild.id); // Limpa o cache ao iniciar
             await refreshDkpParametersCache(guild.id); // Atualiza o cache ao iniciar
             await registerCommands(guild.id); // Registra comandos para a guilda
-            await refreshDkpPointsCache(guild.id); // Atualiza o dkp points
         });
     });
 
