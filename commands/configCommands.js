@@ -4,7 +4,8 @@ const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const validator = require('validator');
 
-async function handleConfigCommands(interaction, guildId) {
+async function handleConfigCommands(interaction) {
+    const guildId = interaction.guildId;
     const subcommand = interaction.options.getSubcommand();
     if (subcommand === 'dkp') {
         await handleConfigDkp(interaction, guildId);
