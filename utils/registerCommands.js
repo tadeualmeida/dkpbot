@@ -5,6 +5,7 @@ const { addCrowCommand, removeCrowCommand, bankCommand } = require('../slashcomm
 const { configCommand } = require('../slashcommands/configSlash');
 const { resetCommand } = require('../slashcommands/resetSlash');
 const { helpCommand, showHelpCommand } = require('../slashcommands/helpSlash');
+const { reportSlash } = require('../slashcommands/reportSlash');
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -16,7 +17,8 @@ async function registerCommands(guildId) {
         rankCommand,
         eventSlashCommand, joinCommand,
         resetCommand,
-        helpCommand, showHelpCommand
+        helpCommand, showHelpCommand,
+        reportSlash
     ].map(command => command.toJSON());
 
     try {

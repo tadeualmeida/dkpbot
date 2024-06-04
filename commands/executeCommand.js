@@ -6,6 +6,7 @@ const { handleResetCommand } = require('./resetCommands');
 const { checkRolePermission } = require('../utils/permissions');
 const { handleHelpCommand, handleShowHelpCommand } = require('./helpCommands');
 const { handleConfigCommands } = require('./configCommands');
+const { handleReportCommand } = require('./reportCommands');
 
 async function executeCommand(interaction) {
     if (!await checkRolePermission(interaction, interaction.commandName)) {
@@ -50,6 +51,9 @@ async function executeCommand(interaction) {
                 await handleHelpCommand(interaction);
             case 'showhelp':
                 await handleShowHelpCommand(interaction);
+                break;
+            case 'rankreport':
+                await handleReportCommand(interaction);
                 break;
             default:
                 await interaction.reply({ content: "This command is not recognized.", ephemeral: true });

@@ -84,6 +84,7 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
     if (bulkOperations.length > 0) {
         await Dkp.bulkWrite(bulkOperations);
         await updateDkpTotal(totalPointsModified, guildId);
+        await refreshDkpPointsCache(guildId);
     }
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
