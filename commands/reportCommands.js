@@ -33,12 +33,13 @@ async function generateRankReport(guild) {
 async function handleReportCommand(interaction) {
     const guild = interaction.guild;
     try {
+        await interaction.deferReply({ ephemeral: true });
         const buffer = await generateRankReport(guild);
         const attachment = new AttachmentBuilder(buffer, { name: 'DKP_Rank_Report.xlsx' });
-        await interaction.reply({ files: [attachment], ephemeral: true });
+        await interaction.followUp({ files: [attachment], ephemeral: true });
     } catch (error) {
         console.error('Error generating rank report:', error);
-        await interaction.reply({ content: 'There was an error generating the rank report.', ephemeral: true });
+        await interaction.followUp({ content: 'There was an error generating the rank report.', ephemeral: true });
     }
 }
 
