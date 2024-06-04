@@ -16,8 +16,8 @@ async function generateRankReport(guild) {
 
     for (let i = 0; i < dkpPoints.length; i++) {
         const dkp = dkpPoints[i];
-        const user = await guild.members.fetch(dkp.userId).catch(() => null);
-        const username = user ? user.user.tag : 'Unknown User';  // Use user.user.tag para incluir o nome e o discriminador
+        const member = await guild.members.fetch(dkp.userId).catch(() => null);
+        const username = member ? member.displayName : 'Unknown User';  // Use member.displayName para o nome na guilda
 
         worksheet.addRow({
             rank: i + 1,
