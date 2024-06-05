@@ -94,7 +94,19 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
 async function handleDkpRank(interaction, guildId) {
     try {
         const dkpPoints = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
-        const descriptions = dkpPoints.map((dkp, index) => `${index + 1}. <@${dkp.userId}> - ${dkp.points} points`);
+        const guild = await interaction.client.guilds.fetch(guildId);
+        
+        const descriptions = await Promise.all(dkpPoints.map(async (dkp, index) => {
+            try {
+                const member = await guild.members.fetch(dkp.userId);
+                const userName = member.displayName;
+                return `${index + 1}. ${userName} - ${dkp.points} points`;
+            } catch (err) {
+                console.error(`Failed to fetch member ${dkp.userId}:`, err);
+                return `${index + 1}. <@${dkp.userId}> - ${dkp.points} points (Name fetch failed)`;
+            }
+        }));
+
         const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Ranking - TOP 50', descriptions);
         await interaction.reply({ embeds: [resultsEmbed], ephemeral: true });
     } catch (error) {
