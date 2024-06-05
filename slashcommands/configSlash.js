@@ -26,23 +26,24 @@ const configCommand = new SlashCommandBuilder()
             .setDescription('Manage DKP parameters.')
             .addStringOption(option => 
                 option.setName('action')
-                    .setDescription('Add or remove a DKP parameter.')
+                    .setDescription('Add, remove, edit, or list DKP parameters.')
                     .setRequired(true)
                     .addChoices(
                         { name: 'add', value: 'add' },
                         { name: 'remove', value: 'remove' },
+                        { name: 'edit', value: 'edit' },
                         { name: 'list', value: 'list' }
                     ))
             .addStringOption(option =>
                 option.setName('name')
                     .setDescription('The name of the DKP parameter.')
-                    .setRequired(false))
+                    .setRequired(false)
+                    .setAutocomplete(true))
             .addIntegerOption(option =>
                 option.setName('points')
                     .setDescription('Point value for the DKP parameter.')
                     .setRequired(false))
     )
-
     .addSubcommand(subcommand =>
         subcommand.setName('channel')
             .setDescription('Manage channels for bot data messages.')
@@ -59,6 +60,6 @@ const configCommand = new SlashCommandBuilder()
                 option.setName('channel')
                     .setDescription('The channel to add or remove.')
                     .setRequired(false))
-    )
+    );
 
 module.exports = { configCommand };

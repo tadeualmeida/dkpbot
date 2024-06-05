@@ -67,12 +67,15 @@ function createDkpParameterDefinedEmbed(name, points, action) {
         description = `DKP parameter **'${name}'** with ${points} points added successfully.`;
     } else if (action === 'removed') {
         description = `DKP parameter **'${name}'** removed successfully.`;
+    } else if (action === 'edited') {
+        description = `DKP parameter **'${name}'** edited to ${points} points successfully.`;
     } else {
         description = `Action not recognized.`;  // Para o caso de uma ação desconhecida
     }
 
-    return createEmbed({ color: action === 'added' ? 'success' : 'danger', title: 'DKP Parameter Update', description });
+    return createEmbed({ color: action === 'added' || action === 'edited' ? 'success' : 'danger', title: 'DKP Parameter Update', description });
 }
+
 
 function createCrowUpdateEmbed(amount, totalCrows) {
     const operation = amount > 0 ? 'added to' : 'removed from';

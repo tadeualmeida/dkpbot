@@ -30,6 +30,20 @@ async function handleInteractionCreate(interaction) {
                 await interaction.respond(choices.slice(0, 25));  // Responde com até 25 sugestões
                 return;
             }
+        } else if (interaction.commandName === 'config' && interaction.options.getSubcommand() === 'dkp' && interaction.options.getFocused(true).name === 'name') {
+            const guildId = interaction.guildId;
+            const search = interaction.options.getFocused(true).value.toLowerCase();
+            const guildCache = getGuildCache(guildId);
+            if (!guildCache) {
+                await interaction.respond([]);
+                return;
+            }
+            const allParameters = guildCache.keys()
+                .filter(key => key.startsWith('dkpParameter:') && key.toLowerCase().includes(search))
+                .map(key => key.replace('dkpParameter:', ''));
+            const choices = allParameters.map(name => ({ name, value: name }));
+            await interaction.respond(choices.slice(0, 25));  // Responde com até 25 sugestões
+            return;
         }
     }
 

@@ -16,10 +16,10 @@ async function handleConfigCommands(interaction) {
 
 async function handleConfigDkp(interaction, guildId) {
     const action = interaction.options.getString('action');
-    if (action === 'add' || action === 'remove') {
+    if (action === 'add' || action === 'remove' || action === 'edit') {
         const name = validator.escape(interaction.options.getString('name').toLowerCase());
         const parameter = await getDkpParameterFromCache(guildId, name);
-        if (!parameter && action === 'remove') {
+        if (!parameter && (action === 'remove' || action === 'edit')) {
             await interaction.reply({ content: "Parameter not found.", ephemeral: true });
             return;
         }
@@ -36,10 +36,26 @@ async function handleConfigDkp(interaction, guildId) {
             await DkpParameter.findOneAndDelete({ guildId, name });
             await refreshDkpParametersCache(guildId);
             await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, null, 'removed')], ephemeral: true });
+        } else if (action === 'edit') {
+            const points = interaction.options.getInteger('points');
+            const updatedParameter = await DkpParameter.findOneAndUpdate(
+                { guildId, name },
+                { $set: { points } },
+                { new: true }
+            );
+            if (updatedParameter) {
+                await refreshDkpParametersCache(guildId); // Atualiza o cache
+                await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, points, 'edited')], ephemeral: true });
+            } else {
+                await interaction.reply({ content: 'DKP parameter not found.', ephemeral: true });
+            }
         }
     } else if (action === 'list') {
         const guildCache = getGuildCache(guildId);
-        const allParameters = guildCache.keys().map(key => guildCache.get(key)).filter(param => param && param.guildId === guildId);
+        const allParameters = guildCache.keys()
+            .filter(key => key.startsWith('dkpParameter:'))
+            .map(key => guildCache.get(key))
+            .filter(param => param && param.guildId === guildId);
         const descriptions = allParameters.map(param => `${param.name}: **${param.points}** points`);
         await interaction.reply({ embeds: [createMultipleResultsEmbed('info', 'DKP Parameters List', descriptions)], ephemeral: true });
     }
