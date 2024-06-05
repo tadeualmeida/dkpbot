@@ -96,8 +96,11 @@ async function handleDkpRank(interaction, guildId) {
         await interaction.deferReply({ ephemeral: true });
 
         const dkpPoints = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
+        const userIds = dkpPoints.map(dkp => dkp.userId);
+        
+        // Fetch only the members who are in the dkpPoints list
         const guild = await interaction.client.guilds.fetch(guildId);
-        const members = await guild.members.fetch();
+        const members = await guild.members.fetch({ user: userIds });
 
         const userIdToNameMap = new Map();
         members.forEach(member => {
