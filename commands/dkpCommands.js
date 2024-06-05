@@ -93,27 +93,27 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
 
 async function handleDkpRank(interaction, guildId) {
     try {
-        await interaction.deferReply({ ephemeral: true }); // Deferindo a resposta da interação
+        await interaction.deferReply({ ephemeral: true });
 
         const dkpPoints = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
         const guild = await interaction.client.guilds.fetch(guildId);
-        
-        const descriptions = await Promise.all(dkpPoints.map(async (dkp, index) => {
-            try {
-                const member = await guild.members.fetch(dkp.userId);
-                const userName = member.displayName;
-                return `${index + 1}. ${userName} - ${dkp.points} points`;
-            } catch (err) {
-                console.error(`Failed to fetch member ${dkp.userId}:`, err);
-                return `${index + 1}. <@${dkp.userId}> - ${dkp.points} points (Name fetch failed)`;
-            }
-        }));
+        const members = await guild.members.fetch();
+
+        const userIdToNameMap = new Map();
+        members.forEach(member => {
+            userIdToNameMap.set(member.user.id, member.displayName);
+        });
+
+        const descriptions = dkpPoints.map((dkp, index) => {
+            const userName = userIdToNameMap.get(dkp.userId) || `<@${dkp.userId}> (Name fetch failed)`;
+            return `${index + 1}. ${userName} - ${dkp.points} points`;
+        });
 
         const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Ranking - TOP 50', descriptions);
-        await interaction.editReply({ embeds: [resultsEmbed] }); // Editando a resposta da interação deferida
+        await interaction.editReply({ embeds: [resultsEmbed] });
     } catch (error) {
         console.error('Failed to retrieve DKP rankings:', error);
-        await interaction.editReply({ content: 'Failed to retrieve DKP rankings due to an error.' }); // Editando a resposta da interação deferida
+        await interaction.editReply({ content: 'Failed to retrieve DKP rankings due to an error.' });
     }
 }
 
