@@ -36,6 +36,17 @@ const eventSlashCommand = new SlashCommandBuilder()
                     .setDescription('The code of the event to list participants')
                     .setRequired(true)
             )
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('cancel')
+            .setDescription('Cancel an event and remove points from participants')
+            .addStringOption(option =>
+                option.setName('code')
+                    .setDescription('The event code')
+                    .setRequired(true)
+                    .setAutocomplete(true)
+            )
     );
 
 const joinCommand = new SlashCommandBuilder()

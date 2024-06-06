@@ -1,3 +1,5 @@
+// executeCommand.js
+
 const { handleDkpCommands } = require('./dkpCommands');
 const { handleCrowCommands } = require('./crowCommands');
 const { handleEventCommands } = require('./eventCommands');
@@ -31,8 +33,7 @@ const commandHandlers = {
     reset: handleResetCommand,
     config: handleConfigCommands,
     rankreport: handleReportCommand,
-    addcrow: handleCrowCommands,
-    removecrow: handleCrowCommands,
+    crow: handleCrowCommands,
 
     // Moderators (can also use user commands)
     event: handleEventCommands,

@@ -1,3 +1,5 @@
+// crowManager.js
+
 const GuildBank = require('../schema/GuildBank');
 const { refreshCrowCache } = require('./cacheManagement');
 
@@ -16,23 +18,23 @@ async function updateCrowCacheAndReturnGuildBank(guildId, updateQuery) {
     return guildBank;
 }
 
-async function addCrows(guildId, amount) {
-    return await updateCrowCacheAndReturnGuildBank(guildId, { $inc: { crows: amount } });
-}
+async function modifyCrows(guildId, amount) {
+    if (amount >= 0) {
+        return await updateCrowCacheAndReturnGuildBank(guildId, { $inc: { crows: amount } });
+    } else {
+        const guildBank = await GuildBank.findOneAndUpdate(
+            { guildId, crows: { $gte: -amount } },
+            { $inc: { crows: amount } },
+            { new: true }
+        );
 
-async function removeCrows(guildId, amount) {
-    const guildBank = await GuildBank.findOneAndUpdate(
-        { guildId, crows: { $gte: amount } },
-        { $inc: { crows: -amount } },
-        { new: true }
-    );
+        if (!guildBank) {
+            throw new Error('Insufficient crows in the bank.');
+        }
 
-    if (!guildBank) {
-        throw new Error('Insufficient crows in the bank.');
+        await refreshCrowCache(guildId);
+        return guildBank;
     }
-
-    await refreshCrowCache(guildId);
-    return guildBank;
 }
 
 async function getCrows(guildId) {
@@ -40,4 +42,4 @@ async function getCrows(guildId) {
     return guildBank ? guildBank.crows : 0;
 }
 
-module.exports = { addCrows, removeCrows, getCrows };
+module.exports = { modifyCrows, getCrows };

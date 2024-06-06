@@ -1,7 +1,7 @@
 const { getGuildCache, getDkpPointsFromCache, refreshDkpPointsCache, getDkpMinimumFromCache, getCrowsFromCache } = require('../utils/cacheManagement');
 const { createDkpBalanceEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
-const GuildBank = require('../schema/GuildBank');
+const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
 
 async function handleDkpCommands(interaction) {
@@ -118,6 +118,12 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
     await interaction.reply({ embeds: [resultsEmbed], ephemeral: true });
+
+    // Enviar mensagem para canais configurados
+    const actionText = isAdd ? 'added points to' : 'removed points from';
+    const executorName = interaction.member ? interaction.member.displayName : executingUser;
+    const notification = descriptions.join('\n');
+    await sendMessageToConfiguredChannels(interaction, `**${executorName}** ${actionText} the following users:\n${notification}`, 'dkp');
 }
 
 async function handleDkpRank(interaction, guildId) {

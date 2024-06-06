@@ -12,7 +12,7 @@ const { getDkpParameterFromCache, refreshDkpPointsCache } = require('../utils/ca
 const { generateRandomCode } = require('../utils/codeGenerator');
 const schedule = require('node-schedule');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
-const ChannelConfig = require('../schema/ChannelConfig');
+const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
 // Mapa para armazenar os jobs agendados
 const scheduledJobs = new Map();
@@ -27,25 +27,15 @@ async function handleEventCommands(interaction) {
                 await endEvent(interaction);
             } else if (subcommand === 'list') {
                 await listEvent(interaction);
+            } else if (subcommand === 'cancel') {
+                await cancelEvent(interaction);
             }
         } else if (interaction.commandName === 'join') {
             await joinEvent(interaction);
         }
     } catch (error) {
         console.error('Error handling event commands:', error);
-        await interaction.reply({ embeds: [createErrorEmbed('No subcommand specified for interaction.')], ephemeral: true });
-    }
-}
-
-async function sendMessageToConfiguredChannels(interaction, description) {
-    const channelConfig = await ChannelConfig.findOne({ guildId: interaction.guildId });
-    if (channelConfig && channelConfig.channels.length > 0) {
-        for (const channelId of channelConfig.channels) {
-            const channel = interaction.client.channels.cache.get(channelId);
-            if (channel) {
-                await channel.send({ embeds: [createInfoEmbed('Event Info', description)] });
-            }
-        }
+        await interaction.reply({ embeds: [createErrorEmbed('An error occurred while handling the event command.')], ephemeral: true });
     }
 }
 
@@ -108,7 +98,7 @@ async function startEvent(interaction) {
             const participantMentions = eventToEnd.participants.map(participant => `<@${participant.userId}>`).join(', ');
             const participantCount = eventToEnd.participants.length;
 
-            await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after 10 minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
+            await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after 10 minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
             await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
         }
         // Remove o job do mapa
@@ -122,7 +112,7 @@ async function startEvent(interaction) {
     const joinEventEmbed = createJoinEventEmbed(dkpParameter, userDkp, eventCode);
 
     await interaction.reply({ embeds: [eventStartedEmbed, joinEventEmbed], ephemeral: true });
-    await sendMessageToConfiguredChannels(interaction, `User <@${userId}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.\nYou have automatically joined the event.`);
+    await sendMessageToConfiguredChannels(interaction, `User <@${userId}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.\nYou have automatically joined the event.`, 'event');
 }
 
 async function endEvent(interaction) {
@@ -141,7 +131,7 @@ async function endEvent(interaction) {
     const participantCount = eventToEnd.participants.length;
 
     await interaction.reply({ embeds: [createEventEndedEmbed()], ephemeral: true });
-    await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`);
+    await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
     await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
 
     // Cancela o job agendado para o evento
@@ -149,6 +139,51 @@ async function endEvent(interaction) {
     if (job) {
         job.cancel();
         scheduledJobs.delete(eventCodeToEnd);
+    }
+}
+
+async function cancelEvent(interaction) {
+    const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
+    const guildId = interaction.guildId;
+    const eventToCancel = await Event.findOne({ guildId, code: eventCode, isActive: true });
+    
+    if (!eventToCancel) {
+        await interaction.reply({ embeds: [createErrorEmbed('No active event found with the provided code.')], ephemeral: true });
+        return;
+    }
+
+    // Remover pontos de todos os participantes
+    const dkpParameter = await getDkpParameterFromCache(guildId, eventToCancel.parameterName);
+    const bulkOperations = eventToCancel.participants.map(participant => ({
+        updateOne: {
+            filter: { guildId, userId: participant.userId },
+            update: {
+                $inc: { points: -dkpParameter.points },
+                $push: { transactions: { type: 'remove', amount: dkpParameter.points, description: `Event ${eventCode} canceled` } }
+            }
+        }
+    }));
+
+    if (bulkOperations.length > 0) {
+        await Dkp.bulkWrite(bulkOperations);
+        await updateDkpTotal(-bulkOperations.length * dkpParameter.points, guildId);
+    }
+
+    eventToCancel.isActive = false;
+    await eventToCancel.save();
+
+    const participantMentions = eventToCancel.participants.map(participant => `<@${participant.userId}>`).join(', ');
+    const participantCount = eventToCancel.participants.length;
+
+    await interaction.reply({ embeds: [createInfoEmbed('Event Canceled', `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`)], ephemeral: true });
+    await sendMessageToConfiguredChannels(interaction, `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled by <@${interaction.user.id}>.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
+    await refreshDkpPointsCache(guildId); // Atualiza o cache após o cancelamento do evento
+
+    // Cancela o job agendado para o evento
+    const job = scheduledJobs.get(eventCode);
+    if (job) {
+        job.cancel();
+        scheduledJobs.delete(eventCode);
     }
 }
 
