@@ -1,5 +1,6 @@
 const { handleDkpCommands } = require('./dkpCommands');
 const { handleCrowCommands } = require('./crowCommands');
+const { handleSetRoleCommand } = require('./roleCommands');
 const { handleEventCommands } = require('./eventCommands');
 const { handleResetCommand } = require('./resetCommands');
 const { checkRolePermission } = require('../utils/permissions');
@@ -7,50 +8,58 @@ const { handleHelpCommand, handleShowHelpCommand } = require('./helpCommands');
 const { handleConfigCommands } = require('./configCommands');
 const { handleReportCommand } = require('./reportCommands');
 
-const commandHandlers = {
-    config: async (interaction) => {
-        const subcommand = interaction.options.getSubcommand();
-        const subcommandHandlers = {
-            dkp: handleConfigCommands,
-            channel: handleConfigCommands,
-            show: handleConfigCommands,
-            role: handleConfigCommands
-        };
-
-        const handler = subcommandHandlers[subcommand];
-        if (handler) {
-            await handler(interaction);
-        } else {
-            await interaction.reply({ content: "This subcommand is not recognized.", ephemeral: true });
-        }
-    },
-    dkp: handleDkpCommands,
-    dkpadd: handleDkpCommands,
-    dkpremove: handleDkpCommands,
-    rank: handleDkpCommands,
-    addcrow: handleCrowCommands,
-    removecrow: handleCrowCommands,
-    bank: handleCrowCommands,
-    event: handleEventCommands,
-    join: handleEventCommands,
-    reset: handleResetCommand,
-    help: handleHelpCommand,
-    showhelp: handleShowHelpCommand,
-    rankreport: handleReportCommand
-};
-
 async function executeCommand(interaction) {
     if (!await checkRolePermission(interaction, interaction.commandName)) {
         return;
     }
+    if (interaction.commandName === 'config') {
+        const subcommand = interaction.options.getSubcommand();
 
-    const handler = commandHandlers[interaction.commandName];
-
-    if (handler) {
-        await handler(interaction);
-    } else {
-        await interaction.reply({ content: "This command is not recognized.", ephemeral: true });
+        switch (subcommand) {
+            case 'dkp':
+            case 'channel':
+            case 'show':
+                await handleConfigCommands(interaction);
+                break;
+            case 'role':
+                await handleSetRoleCommand(interaction);
+                break;
+            default:
+                await interaction.reply({ content: "This subcommand is not recognized.", ephemeral: true });
+                break;
+            }
+     } else {
+        switch (interaction.commandName) {
+            case 'dkpadd':
+            case 'dkpremove':
+            case 'dkp':
+            case 'rank':    
+                await handleDkpCommands(interaction);
+                break;
+            case 'addcrow':
+            case 'removecrow':
+            case 'bank':
+                await handleCrowCommands(interaction);
+                break;
+            case 'event':
+            case 'join':
+                await handleEventCommands(interaction);
+                break;
+            case 'reset':
+                await handleResetCommand(interaction);
+                break;
+            case 'help':
+                await handleHelpCommand(interaction);
+            case 'showhelp':
+                await handleShowHelpCommand(interaction);
+                break;
+            case 'rankreport':
+                await handleReportCommand(interaction);
+                break;
+            default:
+                await interaction.reply({ content: "This command is not recognized.", ephemeral: true });
+                break;
+        }
     }
 }
-
 module.exports = { executeCommand };

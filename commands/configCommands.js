@@ -3,26 +3,17 @@ const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEm
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const DkpMinimum = require('../schema/DkpMinimum');
-const RoleConfig = require('../schema/RoleConfig');
 const validator = require('validator');
 
 async function handleConfigCommands(interaction) {
     const guildId = interaction.guildId;
     const subcommand = interaction.options.getSubcommand();
-
-    switch (subcommand) {
-        case 'dkp':
-            await handleConfigDkp(interaction, guildId);
-            break;
-        case 'channel':
-            await handleConfigChannel(interaction, guildId);
-            break;
-        case 'role':
-            await handleSetRoleCommand(interaction, guildId);
-            break;
-        case 'show':
-            await handleConfigShow(interaction, guildId);
-            break;
+    if (subcommand === 'dkp') {
+        await handleConfigDkp(interaction, guildId);
+    } else if (subcommand === 'channel') {
+        await handleConfigChannel(interaction, guildId);
+    } else if (subcommand === 'show') {
+        await handleConfigShow(interaction, guildId);
     }
 }
 
@@ -121,23 +112,6 @@ async function handleConfigShow(interaction, guildId) {
         const minimumDkp = await getDkpMinimumFromCache(guildId);
         const description = minimumDkp !== null ? `Minimum DKP: **${minimumDkp}** points.` : 'No minimum DKP set.';
         await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP', description)], ephemeral: true });
-    }
-}
-
-async function handleSetRoleCommand(interaction, guildId) {
-    const commandGroup = interaction.options.getString('commandgroup');
-    const role = interaction.options.getRole('role');
-
-    try {
-        await RoleConfig.updateOne(
-            { commandGroup, guildId },
-            { $set: { roleId: role.id } },
-            { upsert: true }
-        );
-        await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
-    } catch (error) {
-        console.error('Error setting role:', error);
-        await interaction.reply({ embeds: [createErrorEmbed('Failed to set role due to an error.')], ephemeral: true });
     }
 }
 

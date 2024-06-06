@@ -55,7 +55,8 @@ const configCommand = new SlashCommandBuilder()
                     .setRequired(true)
                     .addChoices(
                         { name: 'Add Channel', value: 'add' },
-                        { name: 'Remove Channel', value: 'remove' }
+                        { name: 'Remove Channel', value: 'remove' },
+                        { name: 'List Channels', value: 'list' }
                     ))
             .addChannelOption(option =>
                 option.setName('channel')

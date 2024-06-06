@@ -18,8 +18,8 @@ const ChannelConfig = require('../schema/ChannelConfig');
 const scheduledJobs = new Map();
 
 async function handleEventCommands(interaction) {
-    try {
-        if (interaction.commandName === 'event') {
+    switch (interaction.commandName) {
+        case 'event':
             const subcommand = interaction.options.getSubcommand();
             if (subcommand === 'start') {
                 await startEvent(interaction);
@@ -28,12 +28,10 @@ async function handleEventCommands(interaction) {
             } else if (subcommand === 'list') {
                 await listEvent(interaction);
             }
-        } else if (interaction.commandName === 'join') {
+            break;
+        case 'join':
             await joinEvent(interaction);
-        }
-    } catch (error) {
-        console.error('Error handling event commands:', error);
-        await interaction.reply({ embeds: [createErrorEmbed('No subcommand specified for interaction.')], ephemeral: true });
+            break;
     }
 }
 
@@ -66,39 +64,18 @@ async function startEvent(interaction) {
     }
 
     const eventCode = generateRandomCode();
-    const userId = interaction.user.id;
-    const userDisplayName = interaction.member ? interaction.member.displayName : 'N/A';
 
     const newEvent = new Event({
         guildId,
         parameterName,
         code: eventCode,
-        participants: [{
-            userId,
-            username: userDisplayName,
-            discordUsername: interaction.user.username,
-            joinedAt: new Date()
-        }],
+        participants: [],
         isActive: true
     });
     await newEvent.save();
 
-    // Atualiza o DKP do usuário que iniciou o evento
-    const userDkp = await Dkp.findOneAndUpdate(
-        { guildId, userId },
-        {
-            $inc: { points: dkpParameter.points },
-            $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Joined event ${eventCode}` } }
-        },
-        { new: true, upsert: true }
-    );
-
-    if (dkpParameter.points !== 0) {
-        await updateDkpTotal(dkpParameter.points, guildId);
-    }
-
     // Agenda para tornar o evento inativo após 10 minutos
-    const job = schedule.scheduleJob(Date.now() + 600000, async function () {
+    const job = schedule.scheduleJob(Date.now() + 600000, async function() {
         console.log(`Disabling event with code ${eventCode}.`);
         const eventToEnd = await Event.findOne({ guildId, code: eventCode, isActive: true });
         if (eventToEnd) {
@@ -118,11 +95,8 @@ async function startEvent(interaction) {
     // Armazena o job agendado no mapa
     scheduledJobs.set(eventCode, job);
 
-    const eventStartedEmbed = createEventStartedEmbed(parameterName, eventCode);
-    const joinEventEmbed = createJoinEventEmbed(dkpParameter, userDkp, eventCode);
-
-    await interaction.reply({ embeds: [eventStartedEmbed, joinEventEmbed], ephemeral: true });
-    await sendMessageToConfiguredChannels(interaction, `User <@${userId}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.\nYou have automatically joined the event.`);
+    await interaction.reply({ embeds: [createEventStartedEmbed(parameterName, eventCode)], ephemeral: true });
+    await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.`);
 }
 
 async function endEvent(interaction) {
@@ -153,7 +127,7 @@ async function endEvent(interaction) {
 }
 
 async function joinEvent(interaction) {
-    let eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
+    const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
     const event = await Event.findOne({ guildId, code: eventCode, isActive: true });
 
@@ -169,6 +143,7 @@ async function joinEvent(interaction) {
 
     const dkpParameter = await getDkpParameterFromCache(guildId, event.parameterName);
 
+    // Adiciona o ID do usuário como uma string simples
     event.participants.push({
         userId: interaction.user.id,
         username: interaction.member ? interaction.member.displayName : 'N/A',
@@ -176,6 +151,7 @@ async function joinEvent(interaction) {
         joinedAt: new Date()
     });
 
+    // Atualiza o DKP do usuário
     const userDkp = await Dkp.findOneAndUpdate(
         { guildId, userId: interaction.user.id },
         {
@@ -188,12 +164,10 @@ async function joinEvent(interaction) {
     await event.save();
 
     if (dkpParameter.points !== 0) {
-        await updateDkpTotal(dkpParameter.points, guildId);
+        await updateDkpTotal(dkpParameter.points, guildId); // Certifique-se de que o guildId está sendo passado
     }
 
-    const joinEventEmbed = createJoinEventEmbed(dkpParameter, userDkp, eventCode);
-
-    await interaction.reply({ embeds: [joinEventEmbed], ephemeral: true });
+    await interaction.reply({ embeds: [createJoinEventEmbed(dkpParameter, userDkp)], ephemeral: true });
 }
 
 async function listEvent(interaction) {

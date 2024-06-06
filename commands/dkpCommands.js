@@ -30,7 +30,7 @@ async function handleDkpBalance(interaction, guildId, userDkp) {
 
     const crows = await getCrowsFromCache(guildId);
     const crowsPerDkp = totalDkp > 0 ? (crows / totalDkp).toFixed(2) : '0';
-    const userCrows = userDkp ? (userDkp.points * crowsPerDkp).toFixed(2) : '0';
+    const userCrows = userDkp ? (userDkp.points * crowsPerDkp).toFixed(1) : '0';
 
     let description;
     if (userDkp && userDkp.points >= minimumDkp) {
