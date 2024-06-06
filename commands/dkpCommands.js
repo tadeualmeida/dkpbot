@@ -54,7 +54,7 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
         return;
     }
 
-    const userIDs = userIDsInput.split(/[\s,]+/).filter(id => id);
+    const userIDs = [...new Set(userIDsInput.split(/[\s,]+/).filter(id => id))];
     let descriptions = [];
     let totalPointsModified = 0;
 
@@ -73,6 +73,11 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
                 userID = userToModify.user.id;
             } else {
                 await interaction.client.users.fetch(userID);
+            }
+
+            if (userIdSet.has(userID)) {
+                descriptions.push(`User <@${userID}> was mentioned multiple times. Ignoring duplicates.`);
+                continue;
             }
 
             userIdSet.add(userID);
