@@ -6,6 +6,7 @@ const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const GuildBank = require('../schema/GuildBank');
 const RoleConfig = require('../schema/RoleConfig');
+const DkpMinimum = require('../schema/DkpMinimum');
 
 const scheduledDeletions = new Map();
 
@@ -15,7 +16,7 @@ async function checkForOrphanedGuilds(client) {
     
     for (const guildId of storedGuilds) {
         if (!allGuildIds.includes(guildId)) {
-            console.log(`Scheduling deletion for orphaned guild ${guildId}`);
+            console.log(`Orphaned guild find: ${guildId}`);
             await scheduleGuildDeletion(guildId);
         }
     }
@@ -33,6 +34,7 @@ async function scheduleGuildDeletion(guildId) {
             await ChannelConfig.deleteMany({ guildId: guildId });
             await GuildBank.deleteMany({ guildId: guildId });
             await RoleConfig.deleteMany({ guildId: guildId });
+            await DkpMinimum.deleteMany({ guildId: guildId }); // Limpa o cache para a guilda
             clearCache(guildId); // Limpa o cache para a guilda
             console.log(`Successfully deleted data for guild ${guildId}.`);
             scheduledDeletions.delete(guildId); // Remove a referência após a execução

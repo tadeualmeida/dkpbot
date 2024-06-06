@@ -27,9 +27,7 @@ function createMultipleResultsEmbed(color, title, descriptions) {
     let fieldCount = 0;
 
     descriptions.forEach((desc, index) => {
-        // Se adicionar esta linha exceder o limite de caracteres ou de linhas, cria um novo campo
         if ((currentFieldLines.join('\n').length + desc.length > maxFieldLength) || currentFieldLines.length >= maxLinesPerField) {
-            //embed.addFields({ name: `Details ${fieldCount + 1}`, value: currentFieldLines.join('\n'), inline: true });
             embed.addFields({ name: '\u200B', value: currentFieldLines.join('\n'), inline: true });
             currentFieldLines = [];
             fieldCount++;
@@ -37,7 +35,6 @@ function createMultipleResultsEmbed(color, title, descriptions) {
         currentFieldLines.push(`${desc}`);
     });
 
-    // Adiciona o último campo se houver linhas restantes
     if (currentFieldLines.length > 0) {
         embed.addFields({ name: '\u200B', value: currentFieldLines.join('\n'), inline: true });
     }
@@ -70,12 +67,11 @@ function createDkpParameterDefinedEmbed(name, points, action) {
     } else if (action === 'edited') {
         description = `DKP parameter **'${name}'** edited to ${points} points successfully.`;
     } else {
-        description = `Action not recognized.`;  // Para o caso de uma ação desconhecida
+        description = `Action not recognized.`;
     }
 
     return createEmbed({ color: action === 'added' || action === 'edited' ? 'success' : 'danger', title: 'DKP Parameter Update', description });
 }
-
 
 function createCrowUpdateEmbed(amount, totalCrows) {
     const operation = amount > 0 ? 'added to' : 'removed from';
@@ -84,37 +80,36 @@ function createCrowUpdateEmbed(amount, totalCrows) {
     return createEmbed({ color, title: 'Crows Update', description });
 }
 
-function createCrowBalanceEmbed(crows, totalDkp) {
-    const crowsPerDkp = totalDkp > 0 ? (crows / totalDkp).toFixed(2) : '0';
+function createCrowBalanceEmbed(crows, totalDkp, crowsPerDkp, additionalDescription) {
     const description = `The guild bank currently has **${crows}** crows.\n\n` +
-                        `Total DKP accumulated: **${totalDkp}**\n\n` +
-                        `Crows per DKP: **${crowsPerDkp}** crows`;
+                        `Total DKP accumulated by eligible users: **${totalDkp}**\n\n` +
+                        `Estimated crows per DKP: **${crowsPerDkp}** crows\n\n${additionalDescription}`;
 
     return createEmbed({ color: 'info', title: 'Guild Bank Crows', description });
 }
 
 function createEventStartedEmbed(parameterName, eventCode) {
     const description = `An event has started with DKP parameter: ${parameterName}\n\n Event code: ${eventCode}`;
-    return createEmbed({ color: 'info', title: 'Event Started', description});
+    return createEmbed({ color: 'info', title: 'Event Started', description });
 }
 
 function createEventEndedEmbed() {
     const description = 'The event has now ended.';
-    return createEmbed({ color: 'info', title: 'Event Ended', description});
+    return createEmbed({ color: 'info', title: 'Event Ended', description });
 }
 
-function createJoinEventEmbed(dkpParameter,userDkp) {
+function createJoinEventEmbed(dkpParameter, userDkp) {
     const pointText = dkpParameter.points > 1 ? 'points' : 'point';
     const description = `You earned **${dkpParameter.points}** ${pointText}. Now you have **${userDkp.points}** total.`;
-    return createEmbed({ color: 'info', title: 'Joined Event', description});
+    return createEmbed({ color: 'info', title: 'Joined Event', description });
 }
 
 function createErrorEmbed(description) {
-    return createEmbed({ color: 'error', title: 'Error', description});
+    return createEmbed({ color: 'error', title: 'Error', description });
 }
 
 function createInfoEmbed(title, description) {
-    return createEmbed({ color: 'info', title, description});
+    return createEmbed({ color: 'info', title, description });
 }
 
 module.exports = {

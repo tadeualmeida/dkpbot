@@ -18,6 +18,7 @@ async function executeCommand(interaction) {
         switch (subcommand) {
             case 'dkp':
             case 'channel':
+            case 'show':
                 await handleConfigCommands(interaction);
                 break;
             case 'role':

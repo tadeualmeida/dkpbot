@@ -2,14 +2,14 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const configCommand = new SlashCommandBuilder()
     .setName('config')
-    .setDescription('Configure settings for the server.')
+    .setDescription('Configure server settings.')
     .addSubcommand(subcommand =>
         subcommand
             .setName('role')
-            .setDescription('Define roles for command groups.')
+            .setDescription('Assign roles to command groups.')
             .addStringOption(option => 
                 option.setName('commandgroup')
-                    .setDescription('The command group to set the role for.')
+                    .setDescription('Select the command group.')
                     .setRequired(true)
                     .addChoices(
                         { name: 'Members', value: 'users' },
@@ -18,48 +18,64 @@ const configCommand = new SlashCommandBuilder()
                     ))
             .addRoleOption(option =>
                 option.setName('role')
-                    .setDescription('The role to assign to this command group.')
+                    .setDescription('Select the role for the group.')
                     .setRequired(true))
     )
     .addSubcommand(subcommand =>
-        subcommand.setName('dkp')
-            .setDescription('Manage DKP parameters.')
+        subcommand
+            .setName('dkp')
+            .setDescription('Manage DKP settings.')
             .addStringOption(option => 
                 option.setName('action')
-                    .setDescription('Add, remove, edit, or list DKP parameters.')
+                    .setDescription('Choose an action: add, remove, edit, or set minimum points.')
                     .setRequired(true)
                     .addChoices(
-                        { name: 'add', value: 'add' },
-                        { name: 'remove', value: 'remove' },
-                        { name: 'edit', value: 'edit' },
-                        { name: 'list', value: 'list' }
+                        { name: 'Add Parameter', value: 'add' },
+                        { name: 'Remove Parameter', value: 'remove' },
+                        { name: 'Edit Parameter', value: 'edit' },
+                        { name: 'Set Minimum Points', value: 'minimum' }
                     ))
             .addStringOption(option =>
                 option.setName('name')
-                    .setDescription('The name of the DKP parameter.')
+                    .setDescription('Enter the DKP parameter name.')
                     .setRequired(false)
                     .setAutocomplete(true))
             .addIntegerOption(option =>
                 option.setName('points')
-                    .setDescription('Point value for the DKP parameter.')
+                    .setDescription('Enter the DKP point value.')
                     .setRequired(false))
     )
     .addSubcommand(subcommand =>
-        subcommand.setName('channel')
-            .setDescription('Manage channels for bot data messages.')
+        subcommand
+            .setName('channel')
+            .setDescription('Manage bot message channels.')
             .addStringOption(option =>
                 option.setName('action')
-                    .setDescription('Add or remove channels.')
+                    .setDescription('Choose an action: add, remove, or list channels.')
                     .setRequired(true)
                     .addChoices(
-                        { name: 'add', value: 'add' },
-                        { name: 'remove', value: 'remove' },
-                        { name: 'list', value: 'list' }
+                        { name: 'Add Channel', value: 'add' },
+                        { name: 'Remove Channel', value: 'remove' },
+                        { name: 'List Channels', value: 'list' }
                     ))
             .addChannelOption(option =>
                 option.setName('channel')
-                    .setDescription('The channel to add or remove.')
+                    .setDescription('Select the channel.')
                     .setRequired(false))
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('show')
+            .setDescription('Show current configuration.')
+            .addStringOption(option =>
+                option.setName('action')
+                    .setDescription('Select configuration to show.')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Show Parameters', value: 'parameters' },
+                        { name: 'Show Channels', value: 'channels' },
+                        { name: 'Show Minimum DKP', value: 'minimum' }
+                    ))
     );
 
 module.exports = { configCommand };

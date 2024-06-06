@@ -1,8 +1,8 @@
 const { handleInteractionCreate } = require('./interactionCreate');
 const { registerCommands } = require('../utils/registerCommands');
-const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache } = require('../utils/cacheManagement');
+const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache, refreshDkpMinimumCache, refreshCrowCache } = require('../utils/cacheManagement');
 const { clearEmptyEvents } = require('../utils/clearEmptyEvents');
-const { checkForOrphanedGuilds, scheduleGuildDeletion, cancelScheduledGuildDeletion } = require('../utils/guildManagement'); // Importe as novas funções
+const { checkForOrphanedGuilds, scheduleGuildDeletion, cancelScheduledGuildDeletion } = require('../utils/guildManagement');
 
 function setupEventHandlers(client) {
     client.on('ready', async () => {
@@ -12,6 +12,8 @@ function setupEventHandlers(client) {
             clearCache(guild.id); // Limpa o cache ao iniciar
             await refreshDkpParametersCache(guild.id); // Atualiza o cache ao iniciar
             await refreshDkpPointsCache(guild.id); // Atualiza o cache de pontos DKP ao iniciar
+            await refreshDkpMinimumCache(guild.id); // Atualiza o cache do mínimo de DKP
+            await refreshCrowCache(guild.id); // Atualiza o cache de crows ao iniciar
             await registerCommands(guild.id); // Registra comandos para a guilda
         }
 
@@ -24,6 +26,8 @@ function setupEventHandlers(client) {
         clearCache(guild.id); // Limpa o cache ao entrar em uma nova guilda
         await refreshDkpParametersCache(guild.id); // Atualiza o cache ao entrar em uma nova guilda
         await refreshDkpPointsCache(guild.id); // Atualiza o cache de pontos DKP ao entrar em uma nova guilda
+        await refreshDkpMinimumCache(guild.id); // Atualiza o cache do mínimo de DKP
+        await refreshCrowCache(guild.id); // Atualiza o cache de crows ao entrar em uma nova guilda
         await registerCommands(guild.id); // Registra comandos para a nova guilda
     });
 

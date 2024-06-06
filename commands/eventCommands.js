@@ -11,7 +11,7 @@ const Event = require('../schema/Event');
 const { getDkpParameterFromCache, refreshDkpPointsCache } = require('../utils/cacheManagement');
 const { generateRandomCode } = require('../utils/codeGenerator');
 const schedule = require('node-schedule');
-const { Dkp, DkpTotal, updateDkpTotal } = require('../schema/Dkp');
+const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const ChannelConfig = require('../schema/ChannelConfig');
 
 // Mapa para armazenar os jobs agendados
@@ -38,12 +38,12 @@ async function handleEventCommands(interaction) {
 async function sendMessageToConfiguredChannels(interaction, description) {
     const channelConfig = await ChannelConfig.findOne({ guildId: interaction.guildId });
     if (channelConfig && channelConfig.channels.length > 0) {
-        channelConfig.channels.forEach(async (channelId) => {
+        for (const channelId of channelConfig.channels) {
             const channel = interaction.client.channels.cache.get(channelId);
             if (channel) {
                 await channel.send({ embeds: [createInfoEmbed('Event Info', description)] });
             }
-        });
+        }
     }
 }
 
@@ -102,7 +102,7 @@ async function startEvent(interaction) {
 async function endEvent(interaction) {
     const eventCodeToEnd = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
-    const eventToEnd = await Event.findOne({ guildId: guildId, code: eventCodeToEnd, isActive: true });
+    const eventToEnd = await Event.findOne({ guildId, code: eventCodeToEnd, isActive: true });
     if (!eventToEnd || !eventToEnd.isActive) {
         await interaction.reply({ content: "Event not found or already ended.", ephemeral: true });
         return;
@@ -153,7 +153,7 @@ async function joinEvent(interaction) {
 
     // Atualiza o DKP do usuário
     const userDkp = await Dkp.findOneAndUpdate(
-        { guildId: guildId, userId: interaction.user.id },
+        { guildId, userId: interaction.user.id },
         {
             $inc: { points: dkpParameter.points },
             $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Joined event ${eventCode}` } }
@@ -173,7 +173,7 @@ async function joinEvent(interaction) {
 async function listEvent(interaction) {
     const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
-    const event = await Event.findOne({ guildId: guildId, code: eventCode });
+    const event = await Event.findOne({ guildId, code: eventCode });
 
     if (!event) {
         await interaction.reply({ content: `Event with code ${eventCode} not found.`, ephemeral: true });
