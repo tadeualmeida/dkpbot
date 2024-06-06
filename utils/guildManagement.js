@@ -11,33 +11,44 @@ const DkpMinimum = require('../schema/DkpMinimum');
 const scheduledDeletions = new Map();
 
 async function checkForOrphanedGuilds(client) {
-    const allGuildIds = client.guilds.cache.map(guild => guild.id);
-    const storedGuilds = await Dkp.distinct('guildId');
-    
-    for (const guildId of storedGuilds) {
-        if (!allGuildIds.includes(guildId)) {
-            console.log(`Orphaned guild find: ${guildId}`);
-            await scheduleGuildDeletion(guildId);
-        }
+    try {
+        const allGuildIds = new Set(client.guilds.cache.keys());
+        const storedGuilds = await Dkp.distinct('guildId');
+
+        const orphanedGuilds = storedGuilds.filter(guildId => !allGuildIds.has(guildId));
+        
+        orphanedGuilds.forEach(guildId => {
+            console.log(`Orphaned guild found: ${guildId}`);
+            scheduleGuildDeletion(guildId);
+        });
+    } catch (error) {
+        console.error('Error checking for orphaned guilds:', error);
     }
 }
 
 async function scheduleGuildDeletion(guildId) {
     console.log(`Scheduling deletion for guild ${guildId}`);
+
     const job = schedule.scheduleJob(Date.now() + 24 * 60 * 60 * 1000, async function() {
-        console.log(`Deleting data for guild ${guildId}.`);
         try {
-            await Dkp.deleteMany({ guildId: guildId });
-            await DkpTotal.deleteMany({ guildId: guildId });
-            await Event.deleteMany({ guildId: guildId });
-            await DkpParameter.deleteMany({ guildId: guildId });
-            await ChannelConfig.deleteMany({ guildId: guildId });
-            await GuildBank.deleteMany({ guildId: guildId });
-            await RoleConfig.deleteMany({ guildId: guildId });
-            await DkpMinimum.deleteMany({ guildId: guildId }); // Limpa o cache para a guilda
-            clearCache(guildId); // Limpa o cache para a guilda
+            console.log(`Deleting data for guild ${guildId}.`);
+
+            const deletePromises = [
+                Dkp.deleteMany({ guildId }),
+                DkpTotal.deleteMany({ guildId }),
+                Event.deleteMany({ guildId }),
+                DkpParameter.deleteMany({ guildId }),
+                ChannelConfig.deleteMany({ guildId }),
+                GuildBank.deleteMany({ guildId }),
+                RoleConfig.deleteMany({ guildId }),
+                DkpMinimum.deleteMany({ guildId })
+            ];
+
+            await Promise.all(deletePromises);
+            clearCache(guildId);
+            
             console.log(`Successfully deleted data for guild ${guildId}.`);
-            scheduledDeletions.delete(guildId); // Remove a referência após a execução
+            scheduledDeletions.delete(guildId);
         } catch (error) {
             console.error(`Failed to delete data for guild ${guildId}:`, error);
         }
