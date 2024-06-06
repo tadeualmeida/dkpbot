@@ -1,14 +1,23 @@
 const GuildBank = require('../schema/GuildBank');
 const { refreshCrowCache } = require('./cacheManagement');
 
-async function addCrows(guildId, amount) {
+async function updateCrowCacheAndReturnGuildBank(guildId, updateQuery) {
     const guildBank = await GuildBank.findOneAndUpdate(
         { guildId },
-        { $inc: { crows: amount } },
+        updateQuery,
         { new: true, upsert: true }
     );
+
+    if (!guildBank) {
+        throw new Error('Insufficient crows in the bank.');
+    }
+
     await refreshCrowCache(guildId);
     return guildBank;
+}
+
+async function addCrows(guildId, amount) {
+    return await updateCrowCacheAndReturnGuildBank(guildId, { $inc: { crows: amount } });
 }
 
 async function removeCrows(guildId, amount) {
@@ -17,9 +26,11 @@ async function removeCrows(guildId, amount) {
         { $inc: { crows: -amount } },
         { new: true }
     );
+
     if (!guildBank) {
         throw new Error('Insufficient crows in the bank.');
     }
+
     await refreshCrowCache(guildId);
     return guildBank;
 }

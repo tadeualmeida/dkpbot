@@ -24,9 +24,9 @@ async function registerCommands(guildId) {
     try {
         console.log(`Started refreshing application (/) commands for guild ${guildId}.`);
         await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: commands });
-        console.log('Successfully reloaded application (/) commands.');
+        console.log('Successfully reloaded application (/) commands for guild:', guildId);
     } catch (error) {
-        console.error('Failed to refresh commands:', error);
+        console.error(`Failed to refresh commands for guild ${guildId}:`, error);
     }
 }
 

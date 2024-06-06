@@ -98,11 +98,12 @@ function createEventEndedEmbed() {
     return createEmbed({ color: 'info', title: 'Event Ended', description });
 }
 
-function createJoinEventEmbed(dkpParameter, userDkp) {
+function createJoinEventEmbed(dkpParameter, userDkp, eventCode) {
     const pointText = dkpParameter.points > 1 ? 'points' : 'point';
-    const description = `You earned **${dkpParameter.points}** ${pointText}. Now you have **${userDkp.points}** total.`;
-    return createEmbed({ color: 'info', title: 'Joined Event', description });
+    const description = `You earned **${dkpParameter.points}** ${pointText}. Your total will be updated to **${userDkp.points}** after the event ends.\n\nEvent Code: **${eventCode}**`;
+    return createEmbed({ color: 'info', title: `Joined Event`, description });
 }
+
 
 function createErrorEmbed(description) {
     return createEmbed({ color: 'error', title: 'Error', description });
