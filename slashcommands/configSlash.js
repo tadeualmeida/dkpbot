@@ -1,5 +1,3 @@
-// configSlash.js
-
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const configCommand = new SlashCommandBuilder()
@@ -75,7 +73,8 @@ const configCommand = new SlashCommandBuilder()
                     .addChoices(
                         { name: 'Show Parameters', value: 'parameters' },
                         { name: 'Show Channels', value: 'channels' },
-                        { name: 'Show Minimum DKP', value: 'minimum' }
+                        { name: 'Show Minimum DKP', value: 'minimum' },
+                        { name: 'Show Event Timer', value: 'event' }
                     ))
     )
     .addSubcommand(subcommand =>

@@ -1,5 +1,3 @@
-// helpCommands.js
-
 const { createInfoEmbed } = require('../utils/embeds');
 
 const commandCategories = {
@@ -19,6 +17,7 @@ const commandCategories = {
             { name: '/dkp add <users> <points>', description: 'Adds DKP points to one or more users.', permissions: 'Administrators, Moderators', examples: ['/dkp add @user1 10', '/dkp add @user1 @user2 5'] },
             { name: '/dkp remove <users> <points>', description: 'Removes DKP points from one or more users.', permissions: 'Administrators, Moderators', examples: ['/dkp remove @user1 10', '/dkp remove @user1 @user2 5'] },
             { name: '/rank', description: 'Displays the DKP ranking for the guild.', permissions: 'Members', examples: ['/rank'] },
+            { name: '/rankreport', description: 'Generates a report of the DKP ranking.', permissions: 'Administrators', examples: ['/rankreport'] },
         ]
     },
     Configuration: {
@@ -28,6 +27,7 @@ const commandCategories = {
             { name: '/config role <commandGroup> <role>', description: 'Sets role permissions for command groups.', permissions: 'Administrators', examples: ['/config role administrators @admin', '/config role moderators @mod'] },
             { name: '/config channel <action> <channel>', description: 'Manages channels for bot notifications.', permissions: 'Administrators', examples: ['/config channel add #general', '/config channel remove #general'] },
             { name: '/config event timer <minutes>', description: 'Sets the event timer duration.', permissions: 'Administrators', examples: ['/config event timer 10'] },
+            { name: '/config show <parameters|channels|minimum|event>', description: 'Shows current configuration settings.', permissions: 'Administrators', examples: ['/config show parameters', '/config show channels', '/config show minimum', '/config show event'] },
         ]
     },
     Event: {

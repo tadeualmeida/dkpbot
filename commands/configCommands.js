@@ -1,6 +1,6 @@
 // configCommands.js
 
-const { getGuildCache, refreshDkpParametersCache, refreshDkpMinimumCache, getDkpMinimumFromCache, getChannelsFromCache } = require('../utils/cacheManagement');
+const { getGuildCache, refreshDkpParametersCache, refreshDkpMinimumCache, getDkpMinimumFromCache, getChannelsFromCache, getEventTimerFromCache, refreshEventTimerCache } = require('../utils/cacheManagement');
 const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
@@ -127,6 +127,10 @@ async function handleConfigShow(interaction, guildId) {
         const minimumDkp = await getDkpMinimumFromCache(guildId);
         const description = minimumDkp !== null ? `Minimum DKP: **${minimumDkp}** points.` : 'No minimum DKP set.';
         await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP', description)], ephemeral: true });
+    } else if (action === 'event') {
+        const eventTimer = await getEventTimerFromCache(guildId);
+        const description = `Event Timeout: **${eventTimer}** minutes.`;
+        await interaction.reply({ embeds: [createInfoEmbed('Event Timeout', description)], ephemeral: true });
     }
 }
 
@@ -135,7 +139,7 @@ async function handleConfigEvent(interaction, guildId) {
     if (action === 'timer') {
         const minutes = interaction.options.getInteger('minutes');
         if (minutes == null || minutes <= 0) {
-            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid timer duration in minutes.")], ephemeral: true });
+            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid timeout duration in minutes.")], ephemeral: true });
             return;
         }
 
@@ -145,7 +149,9 @@ async function handleConfigEvent(interaction, guildId) {
             { new: true, upsert: true }
         );
 
-        await interaction.reply({ embeds: [createInfoEmbed('Event Timer Set', `Event timer set to ${minutes} minutes successfully.`)], ephemeral: true });
+        await refreshEventTimerCache(guildId); // Atualiza o cache do timeout do evento
+
+        await interaction.reply({ embeds: [createInfoEmbed('Event Timeout Set', `Event timeout set to ${minutes} minutes successfully.`)], ephemeral: true });
     }
 }
 
