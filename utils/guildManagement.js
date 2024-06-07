@@ -1,4 +1,6 @@
-const schedule = require('node-schedule');
+// guildManagement.js
+
+const { scheduleJob, cancelScheduledJob } = require('./scheduler');
 const { Dkp, DkpTotal } = require('../schema/Dkp');
 const Event = require('../schema/Event');
 const { clearCache } = require('./cacheManagement');
@@ -7,6 +9,7 @@ const ChannelConfig = require('../schema/ChannelConfig');
 const GuildBank = require('../schema/GuildBank');
 const RoleConfig = require('../schema/RoleConfig');
 const DkpMinimum = require('../schema/DkpMinimum');
+const EventTimer = require('../schema/EventTimer');
 
 const scheduledDeletions = new Map();
 
@@ -29,7 +32,7 @@ async function checkForOrphanedGuilds(client) {
 async function scheduleGuildDeletion(guildId) {
     console.log(`Scheduling deletion for guild ${guildId}`);
 
-    const job = schedule.scheduleJob(Date.now() + 24 * 60 * 60 * 1000, async function() {
+    await scheduleJob(guildId, guildId, 1440, async () => {  // 1440 minutes = 24 hours
         try {
             console.log(`Deleting data for guild ${guildId}.`);
 
@@ -41,7 +44,8 @@ async function scheduleGuildDeletion(guildId) {
                 ChannelConfig.deleteMany({ guildId }),
                 GuildBank.deleteMany({ guildId }),
                 RoleConfig.deleteMany({ guildId }),
-                DkpMinimum.deleteMany({ guildId })
+                DkpMinimum.deleteMany({ guildId }),
+                EventTimer.deleteMany({ guildId })
             ];
 
             await Promise.all(deletePromises);
@@ -58,12 +62,9 @@ async function scheduleGuildDeletion(guildId) {
 }
 
 function cancelScheduledGuildDeletion(guildId) {
-    const job = scheduledDeletions.get(guildId);
-    if (job) {
-        job.cancel();
-        scheduledDeletions.delete(guildId);
-        console.log(`Cancelled deletion for guild ${guildId}`);
-    }
+    cancelScheduledJob(guildId);
+    scheduledDeletions.delete(guildId);
+    console.log(`Cancelled deletion for guild ${guildId}`);
 }
 
 module.exports = { checkForOrphanedGuilds, scheduleGuildDeletion, cancelScheduledGuildDeletion };

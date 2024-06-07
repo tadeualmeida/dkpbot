@@ -1,3 +1,5 @@
+// configSlash.js
+
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const configCommand = new SlashCommandBuilder()
@@ -75,6 +77,22 @@ const configCommand = new SlashCommandBuilder()
                         { name: 'Show Channels', value: 'channels' },
                         { name: 'Show Minimum DKP', value: 'minimum' }
                     ))
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('event')
+            .setDescription('Manage event settings.')
+            .addStringOption(option =>
+                option.setName('action')
+                    .setDescription('Choose an action: set timer.')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Set Timer', value: 'timer' }
+                    ))
+            .addIntegerOption(option =>
+                option.setName('minutes')
+                    .setDescription('Enter the timer duration in minutes.')
+                    .setRequired(true))
     );
 
 module.exports = { configCommand };

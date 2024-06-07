@@ -89,8 +89,14 @@ function createCrowBalanceEmbed(crows, totalDkp, crowsPerDkp, additionalDescript
 }
 
 function createEventStartedEmbed(parameterName, eventCode) {
-    const description = `An event has started with DKP parameter: ${parameterName}\n\n Event code: ${eventCode}`;
+    const description = `An event has started with DKP parameter: ${parameterName}\n\n Event code: **${eventCode}**`;
     return createEmbed({ color: 'info', title: 'Event Started', description });
+}
+
+function createCombinedEventEmbed(parameterName, eventCode, dkpParameter, userDkp) {
+    const pointText = dkpParameter.points > 1 ? 'points' : 'point';
+    const description = `An event has started with DKP parameter: ${parameterName}\n\nEvent code: **${eventCode}**\n\nYou have been automatically added to the event and earned **${dkpParameter.points}** ${pointText}. Your total will be updated to **${userDkp.points}** after the event ends.`;
+    return createEmbed({ color: 'info', title: 'Event Started and Joined', description });
 }
 
 function createEventEndedEmbed() {
@@ -124,5 +130,6 @@ module.exports = {
     createEventEndedEmbed,
     createJoinEventEmbed,
     createErrorEmbed,
-    createInfoEmbed
+    createInfoEmbed,
+    createCombinedEventEmbed
 };

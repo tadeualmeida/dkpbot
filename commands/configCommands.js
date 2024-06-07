@@ -1,9 +1,12 @@
-const { getGuildCache, refreshDkpParametersCache, refreshDkpMinimumCache, getDkpParameterFromCache, getDkpMinimumFromCache, getChannelsFromCache } = require('../utils/cacheManagement');
+// configCommands.js
+
+const { getGuildCache, refreshDkpParametersCache, refreshDkpMinimumCache, getDkpMinimumFromCache, getChannelsFromCache } = require('../utils/cacheManagement');
 const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const DkpMinimum = require('../schema/DkpMinimum');
 const RoleConfig = require('../schema/RoleConfig');
+const EventTimer = require('../schema/EventTimer');
 const validator = require('validator');
 
 async function handleConfigCommands(interaction) {
@@ -22,6 +25,9 @@ async function handleConfigCommands(interaction) {
             break;
         case 'show':
             await handleConfigShow(interaction, guildId);
+            break;
+        case 'event':
+            await handleConfigEvent(interaction, guildId);
             break;
     }
 }
@@ -121,6 +127,25 @@ async function handleConfigShow(interaction, guildId) {
         const minimumDkp = await getDkpMinimumFromCache(guildId);
         const description = minimumDkp !== null ? `Minimum DKP: **${minimumDkp}** points.` : 'No minimum DKP set.';
         await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP', description)], ephemeral: true });
+    }
+}
+
+async function handleConfigEvent(interaction, guildId) {
+    const action = interaction.options.getString('action');
+    if (action === 'timer') {
+        const minutes = interaction.options.getInteger('minutes');
+        if (minutes == null || minutes <= 0) {
+            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid timer duration in minutes.")], ephemeral: true });
+            return;
+        }
+
+        await EventTimer.findOneAndUpdate(
+            { guildId },
+            { $set: { EventTimer: minutes } },
+            { new: true, upsert: true }
+        );
+
+        await interaction.reply({ embeds: [createInfoEmbed('Event Timer Set', `Event timer set to ${minutes} minutes successfully.`)], ephemeral: true });
     }
 }
 

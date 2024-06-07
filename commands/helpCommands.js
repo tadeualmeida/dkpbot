@@ -1,3 +1,5 @@
+// helpCommands.js
+
 const { createInfoEmbed } = require('../utils/embeds');
 
 const commandCategories = {
@@ -25,6 +27,7 @@ const commandCategories = {
             { name: '/config dkp <action> <name> <points>', description: 'Manages DKP parameters (add, remove, edit, or set minimum points).', permissions: 'Administrators', examples: ['/config dkp add bossKill 10', '/config dkp remove bossKill'] },
             { name: '/config role <commandGroup> <role>', description: 'Sets role permissions for command groups.', permissions: 'Administrators', examples: ['/config role administrators @admin', '/config role moderators @mod'] },
             { name: '/config channel <action> <channel>', description: 'Manages channels for bot notifications.', permissions: 'Administrators', examples: ['/config channel add #general', '/config channel remove #general'] },
+            { name: '/config event timer <minutes>', description: 'Sets the event timer duration.', permissions: 'Administrators', examples: ['/config event timer 10'] },
         ]
     },
     Event: {
@@ -32,14 +35,15 @@ const commandCategories = {
         commands: [
             { name: '/event start <parameter>', description: 'Starts an event with the specified parameter.', permissions: 'Administrators, Moderators', examples: ['/event start bossKill'] },
             { name: '/event end <code>', description: 'Ends the event with the specified code.', permissions: 'Administrators, Moderators', examples: ['/event end AB3'] },
+            { name: '/event cancel <code>', description: 'Cancels the event with the specified code and removes DKP points.', permissions: 'Administrators, Moderators', examples: ['/event cancel AB3'] },
             { name: '/join <code>', description: 'Joins the event with the specified code.', permissions: 'Members', examples: ['/join AB3'] },
         ]
     },
     Crow: {
         description: 'Commands for managing crows in the guild bank.',
         commands: [
-            { name: '/addcrow <amount>', description: 'Adds a specified amount of crows to the guild bank.', permissions: 'Administrators, Moderators', examples: ['/addcrow 100'] },
-            { name: '/removecrow <amount>', description: 'Removes a specified amount of crows from the guild bank.', permissions: 'Administrators, Moderators', examples: ['/removecrow 50'] },
+            { name: '/crow add <amount>', description: 'Adds a specified amount of crows to the guild bank.', permissions: 'Administrators, Moderators', examples: ['/crow add 100'] },
+            { name: '/crow remove <amount>', description: 'Removes a specified amount of crows from the guild bank.', permissions: 'Administrators, Moderators', examples: ['/crow remove 50'] },
         ]
     }
 };
