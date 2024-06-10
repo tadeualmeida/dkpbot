@@ -165,6 +165,10 @@ async function handleSetRoleCommand(interaction, guildId) {
             { $set: { roleId: role.id } },
             { upsert: true }
         );
+
+        // Atualiza o cache
+        await refreshRoleConfigCache(guildId);
+
         await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
     } catch (error) {
         console.error('Error setting role:', error);

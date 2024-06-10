@@ -1,4 +1,4 @@
-const RoleConfig = require('../schema/RoleConfig');
+const { getRoleConfigFromCache } = require('../utils/cacheManagement');
 const { PermissionsBitField } = require('discord.js');
 
 async function checkRolePermission(interaction, commandName) {
@@ -6,29 +6,27 @@ async function checkRolePermission(interaction, commandName) {
         return true;
     }
 
-    const rolesConfig = await RoleConfig.find({ guildId: interaction.guildId }).lean().exec();
+    const roleConfigs = await getRoleConfigFromCache(interaction.guildId);
     const memberRoles = interaction.member.roles.cache;
 
     const commandGroups = {
-        administrators: ['dkpadd', 'dkpremopve', 'addcrow', 'removecrow', 'reset', 'rankreport', 'config'],
+        users: ['bank', 'dkp', 'rank', 'join', 'help'],
         moderators: ['event', 'showhelp'],
-        users: ['bank', 'dkp', 'rank', 'join', 'help']
+        administrators: ['dkpadd', 'dkpremopve', 'addcrow', 'removecrow', 'reset', 'rankreport', 'config']
     };
 
-    const hasPermission = rolesConfig.some(config => {
+    // Combine commands to reflect the hierarchy: administrators > moderators > users
+    const allCommands = {
+        users: commandGroups.users,
+        moderators: [...commandGroups.moderators, ...commandGroups.users],
+        administrators: [...commandGroups.administrators, ...commandGroups.moderators, ...commandGroups.users]
+    };
+
+    const hasPermission = roleConfigs.some(config => {
         if (!memberRoles.has(config.roleId)) return false;
 
-        // Administrators can use all commands
-        if (config.commandGroup === 'administrators') return true;
-
-        // Moderators can use moderator and user commands
-        if (config.commandGroup === 'moderators' && 
-            (commandGroups.moderators.includes(commandName) || commandGroups.users.includes(commandName))) return true;
-
-        // Users can use only user commands
-        if (config.commandGroup === 'users' && commandGroups.users.includes(commandName)) return true;
-
-        return false;
+        // Check if the command is allowed for the role's command group
+        return allCommands[config.commandGroup] && allCommands[config.commandGroup].includes(commandName);
     });
 
     if (!hasPermission) {

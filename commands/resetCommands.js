@@ -1,7 +1,7 @@
 const Event = require('../schema/Event');
 const GuildBank = require('../schema/GuildBank');
 const { Dkp, DkpTotal } = require('../schema/Dkp');
-const { refreshDkpParametersCache, clearCache } = require('../utils/cacheManagement');
+const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache, refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, refreshEligibleUsersCache } = require('../utils/cacheManagement');
 const { createInfoEmbed } = require('../utils/embeds');
 
 async function handleResetCommand(interaction) {
@@ -20,7 +20,12 @@ async function handleResetCommand(interaction) {
 
     // Limpa e atualiza o cache
     clearCache(guildId);
-    await refreshDkpParametersCache(guildId);
+    await refreshDkpParametersCache(guildId), 
+    await refreshDkpPointsCache(guildId), 
+    await refreshDkpMinimumCache(guildId), 
+    await refreshCrowCache(guildId), 
+    await refreshEventTimerCache(guildId), 
+    await refreshEligibleUsersCache(guildId)
 
     // Responde ao usuário
     await interaction.reply({ embeds: [createInfoEmbed('Reset Complete', 'All DKP points, events, and crows have been reset for this guild.')], ephemeral: true });

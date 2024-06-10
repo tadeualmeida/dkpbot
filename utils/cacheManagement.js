@@ -7,8 +7,9 @@ const DkpMinimum = require('../schema/DkpMinimum');
 const GuildBank = require('../schema/GuildBank');
 const ChannelConfig = require('../schema/ChannelConfig');
 const EventTimer = require('../schema/EventTimer');
+const Event = require('../schema/Event');
+const RoleConfig = require('../schema/RoleConfig');
 
-// Cria caches individuais para cada guilda
 const guildCaches = new Map();
 
 function getGuildCache(guildId) {
@@ -94,6 +95,24 @@ async function getEventTimerFromCache(guildId) {
     return await getFromCache(guildId, 'eventTimer', EventTimer, 10);
 }
 
+async function refreshEligibleUsersCache(guildId) {
+    const minimumDkpRecord = await DkpMinimum.findOne({ guildId });
+    const minimumDkp = minimumDkpRecord ? minimumDkpRecord.minimumPoints : 0;
+    const eligibleUsers = await Dkp.find({ guildId, points: { $gte: minimumDkp } });
+    const guildCache = getGuildCache(guildId);
+    guildCache.set('eligibleUsers', eligibleUsers);
+}
+
+async function getEligibleUsersFromCache(guildId) {
+    const guildCache = getGuildCache(guildId);
+    let eligibleUsers = guildCache.get('eligibleUsers');
+    if (!eligibleUsers) {
+        await refreshEligibleUsersCache(guildId);
+        eligibleUsers = guildCache.get('eligibleUsers');
+    }
+    return eligibleUsers;
+}
+
 function clearCache(guildId) {
     const guildCache = getGuildCache(guildId);
     guildCache.flushAll();
@@ -139,6 +158,90 @@ async function getChannelsFromCache(guildId) {
     return await getFromCache(guildId, 'channels', ChannelConfig, []);
 }
 
+// Funções para gerenciamento de participantes de eventos
+function addParticipantToEventCache(guildId, eventCode, participant) {
+    const guildCache = getGuildCache(guildId);
+    let eventParticipants = guildCache.get(`event:${eventCode}`);
+    if (!eventParticipants) {
+        eventParticipants = [];
+    }
+    eventParticipants.push(participant);
+    guildCache.set(`event:${eventCode}`, eventParticipants);
+}
+
+function getEventParticipantsFromCache(guildId, eventCode) {
+    const guildCache = getGuildCache(guildId);
+    return guildCache.get(`event:${eventCode}`) || [];
+}
+
+function clearEventParticipantsCache(guildId, eventCode) {
+    const guildCache = getGuildCache(guildId);
+    guildCache.del(`event:${eventCode}`);
+}
+
+// Funções para gerenciamento de eventos ativos
+function addActiveEventToCache(guildId, event) {
+    const guildCache = getGuildCache(guildId);
+    let activeEvents = guildCache.get('activeEvents');
+    if (!activeEvents) {
+        activeEvents = [];
+    }
+    activeEvents.push(event);
+    guildCache.set('activeEvents', activeEvents);
+}
+
+function getActiveEventsFromCache(guildId) {
+    const guildCache = getGuildCache(guildId);
+    return guildCache.get('activeEvents') || [];
+}
+
+function removeActiveEventFromCache(guildId, eventCode) {
+    const guildCache = getGuildCache(guildId);
+    let activeEvents = guildCache.get('activeEvents');
+    if (activeEvents) {
+        activeEvents = activeEvents.filter(event => event.code !== eventCode);
+        guildCache.set('activeEvents', activeEvents);
+    }
+}
+
+// Funções para gerenciamento de ranking
+async function refreshDkpRankingCache(guildId) {
+    const dkpRanking = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
+    const guildCache = getGuildCache(guildId);
+    guildCache.set('dkpRanking', dkpRanking);
+}
+
+async function getDkpRankingFromCache(guildId) {
+    const guildCache = getGuildCache(guildId);
+    let dkpRanking = guildCache.get('dkpRanking');
+    if (!dkpRanking) {
+        await refreshDkpRankingCache(guildId);
+        dkpRanking = guildCache.get('dkpRanking');
+    }
+    return dkpRanking;
+}
+
+// Funções para gerenciamento de configurações de função
+async function refreshRoleConfigCache(guildId) {
+    await refreshCache(guildId, RoleConfig, 'roleConfig', [], configs => {
+        const guildCache = getGuildCache(guildId);
+        configs.forEach(config => {
+            guildCache.set(`roleConfig:${config.commandGroup}`, config);
+        });
+        return configs;
+    });
+}
+
+async function getRoleConfigFromCache(guildId) {
+    const guildCache = getGuildCache(guildId);
+    let roleConfig = guildCache.get('roleConfig');
+    if (!roleConfig) {
+        await refreshRoleConfigCache(guildId);
+        roleConfig = guildCache.get('roleConfig');
+    }
+    return roleConfig;
+}
+
 module.exports = { 
     refreshDkpParametersCache, 
     getDkpParameterFromCache, 
@@ -152,5 +255,17 @@ module.exports = {
     getCrowsFromCache,
     getChannelsFromCache,
     refreshEventTimerCache,
-    getEventTimerFromCache
+    getEventTimerFromCache,
+    refreshEligibleUsersCache,
+    getEligibleUsersFromCache,
+    addParticipantToEventCache,
+    getEventParticipantsFromCache,
+    clearEventParticipantsCache,
+    addActiveEventToCache,
+    getActiveEventsFromCache,
+    removeActiveEventFromCache,
+    refreshDkpRankingCache,
+    getDkpRankingFromCache,
+    refreshRoleConfigCache,
+    getRoleConfigFromCache
 };

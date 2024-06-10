@@ -1,6 +1,14 @@
-// dkpCommands.js
-
-const { getGuildCache, getDkpPointsFromCache, refreshDkpPointsCache, getDkpMinimumFromCache, getCrowsFromCache } = require('../utils/cacheManagement');
+const { 
+    getGuildCache, 
+    getDkpPointsFromCache, 
+    refreshDkpPointsCache, 
+    getDkpMinimumFromCache, 
+    getCrowsFromCache, 
+    refreshEligibleUsersCache, 
+    getEligibleUsersFromCache, 
+    refreshDkpRankingCache, 
+    getDkpRankingFromCache 
+} = require('../utils/cacheManagement');
 const { createDkpBalanceEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
@@ -27,19 +35,19 @@ async function handleDkpCommands(interaction) {
 
 async function handleDkpBalance(interaction, guildId, userDkp) {
     const minimumDkp = await getDkpMinimumFromCache(guildId);
-    const eligibleUsers = await Dkp.find({ guildId, points: { $gte: minimumDkp } });
-    const totalDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
-
     const crows = await getCrowsFromCache(guildId);
-    const crowsPerDkp = totalDkp > 0 ? (crows / totalDkp).toFixed(2) : '0';
-    const userCrows = userDkp ? (userDkp.points * crowsPerDkp).toFixed(2) : '0';
+
+    const eligibleUsers = await getEligibleUsersFromCache(guildId);
+    const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
+    const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
 
     let description;
-    if (userDkp && userDkp.points >= minimumDkp) {
+    if (minimumDkp === 0 || (userDkp && userDkp.points >= minimumDkp)) {
+        const userCrows = (userDkp.points * crowsPerDkp).toFixed(2);
         description = `You have **${userDkp.points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nEstimated crows per DKP: **${crowsPerDkp}** crows\n\nCrows you are currently earning: **${userCrows}**`;
     } else {
         const pointsNeeded = minimumDkp - (userDkp ? userDkp.points : 0);
-        description = `You have **${userDkp ? userDkp.points : 0}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nEstimated crows per DKP: **${crowsPerDkp}** crows\n\n**Note:** The minimum DKP to earn crows is **${minimumDkp}** DKP.\nYou need **${pointsNeeded}** more points to start earning crows.`;
+        description = `You have **${userDkp ? userDkp.points : 0}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nYou are currently earning **0** crows because your DKP is below the minimum required.\n\n**Note:** The minimum DKP to earn crows is **${minimumDkp}** DKP. You need **${pointsNeeded}** more points to start earning crows.`;
     }
 
     const embed = createInfoEmbed('DKP Balance', description);
@@ -116,6 +124,8 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
         await Dkp.bulkWrite(bulkOperations);
         await updateDkpTotal(totalPointsModified, guildId);
         await refreshDkpPointsCache(guildId);
+        await refreshEligibleUsersCache(guildId);
+        await refreshDkpRankingCache(guildId);
     }
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
@@ -132,8 +142,8 @@ async function handleDkpRank(interaction, guildId) {
     try {
         await interaction.deferReply({ ephemeral: true });
 
-        const dkpPoints = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
-        const userIds = dkpPoints.map(dkp => dkp.userId);
+        const dkpRanking = await getDkpRankingFromCache(guildId);
+        const userIds = dkpRanking.map(dkp => dkp.userId);
 
         const guild = await interaction.client.guilds.fetch(guildId);
         const members = await guild.members.fetch({ user: userIds });
@@ -143,7 +153,7 @@ async function handleDkpRank(interaction, guildId) {
             userIdToNameMap.set(member.user.id, member.displayName);
         });
 
-        const descriptions = dkpPoints.map((dkp, index) => {
+        const descriptions = dkpRanking.map((dkp, index) => {
             const userName = userIdToNameMap.get(dkp.userId) || `<@${dkp.userId}> (Name fetch failed)`;
             return `${index + 1}. **${userName}** - ${dkp.points} points`;
         });

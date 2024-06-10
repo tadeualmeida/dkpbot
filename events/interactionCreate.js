@@ -1,7 +1,6 @@
 const { checkRolePermission } = require('../utils/permissions');
 const { executeCommand } = require('../commands/executeCommand');
-const { getGuildCache } = require('../utils/cacheManagement');
-const Event = require('../schema/Event');
+const { getGuildCache, getActiveEventsFromCache } = require('../utils/cacheManagement');
 
 async function handleInteractionCreate(interaction) {
     if (interaction.isAutocomplete()) {
@@ -50,7 +49,7 @@ async function handleParameterAutocomplete(interaction, guildId, search) {
 }
 
 async function handleEventCodeAutocomplete(interaction, guildId, search) {
-    const activeEvents = await Event.find({ guildId, isActive: true }).lean().exec();
+    const activeEvents = getActiveEventsFromCache(guildId);
     const matchingEvents = activeEvents.filter(event => event.code.toLowerCase().includes(search));
     const choices = matchingEvents.map(event => ({ name: event.code, value: event.code }));
     await interaction.respond(choices.slice(0, 25));  // Respond with up to 25 suggestions

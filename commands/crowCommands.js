@@ -1,10 +1,7 @@
-// crowCommands.js
-
 const { createCrowUpdateEmbed, createCrowBalanceEmbed, createErrorEmbed } = require('../utils/embeds');
 const { modifyCrows, getCrows } = require('../utils/crowManager');
-const { DkpTotal, Dkp } = require('../schema/Dkp');
 const validator = require('validator');
-const { getDkpMinimumFromCache, getCrowsFromCache, refreshCrowCache } = require('../utils/cacheManagement');
+const { getDkpMinimumFromCache, getCrowsFromCache, refreshCrowCache, getEligibleUsersFromCache } = require('../utils/cacheManagement');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
 async function handleCrowCommands(interaction) {
@@ -53,17 +50,14 @@ async function handleModifyCrow(interaction, guildId, isAdd) {
 async function handleBank(interaction, guildId) {
     try {
         const crows = await getCrowsFromCache(guildId);
-        const totalDkpResult = await DkpTotal.findOne({ guildId });
-        const totalDkp = totalDkpResult ? totalDkpResult.totalDkp : 0;
         const minimumDkp = await getDkpMinimumFromCache(guildId);
-
-        const eligibleUsers = await Dkp.find({ guildId, points: { $gte: minimumDkp } });
+        const eligibleUsers = await getEligibleUsersFromCache(guildId);
         const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
         const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
 
         let additionalDescription = '';
         if (minimumDkp > 0) {
-            additionalDescription = `Minimum DKP required to be eligible to earn crows: ${minimumDkp} DKP.`;
+            additionalDescription = `Minimum DKP required to be eligible to earn crows: **${minimumDkp}** DKP.`;
         }
 
         await interaction.editReply({ embeds: [createCrowBalanceEmbed(crows, eligibleDkp, crowsPerDkp, additionalDescription)] });

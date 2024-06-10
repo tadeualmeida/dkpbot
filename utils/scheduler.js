@@ -1,9 +1,17 @@
-// utils/scheduler.js
-
 const schedule = require('node-schedule');
-const { refreshDkpPointsCache } = require('./cacheManagement');
+const { 
+    refreshDkpPointsCache, 
+    refreshEligibleUsersCache, 
+    getEventParticipantsFromCache, 
+    clearEventParticipantsCache, 
+    getDkpParameterFromCache, 
+    refreshDkpRankingCache,
+    addActiveEventToCache,
+    removeActiveEventFromCache
+} = require('./cacheManagement');
 const Event = require('../schema/Event');
 const { sendMessageToConfiguredChannels } = require('./channelUtils');
+const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 
 const scheduledJobs = new Map();
 
@@ -32,26 +40,58 @@ function cancelScheduledJob(guildId, jobId) {
         scheduledJobs.delete(jobKey);
         console.log(`Scheduled job ${jobKey} cancelled.`);
     }
+
+    // Remove o evento ativo do cache e limpa o cache de participantes
+    removeActiveEventFromCache(guildId, jobId);
+    clearEventParticipantsCache(guildId, jobId);
 }
 
 async function scheduleEventEnd(eventCode, parameterName, guildId, interaction, eventTimer) {
     console.log(`Scheduling event end for event ${eventCode} in ${eventTimer} minutes.`);
     await scheduleJob(guildId, eventCode, eventTimer, async () => {
         console.log(`Attempting to end event with code ${eventCode} for guild ${guildId}.`);
+
         const eventToEnd = await Event.findOne({ guildId, code: eventCode, isActive: true });
-        if (eventToEnd) {
-            eventToEnd.isActive = false;
-            await eventToEnd.save();
-
-            const participantMentions = eventToEnd.participants.map(participant => `<@${participant.userId}>`).join(', ');
-            const participantCount = eventToEnd.participants.length;
-
-            await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after ${eventTimer} minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
-            await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
-            console.log(`Event with code ${eventCode} for guild ${guildId} has been ended.`);
-        } else {
+        if (!eventToEnd) {
             console.log(`Event with code ${eventCode} for guild ${guildId} was not found or is already inactive.`);
+            return;
         }
+
+        const participants = getEventParticipantsFromCache(guildId, eventCode);
+
+        eventToEnd.participants = participants;
+        eventToEnd.isActive = false;
+        await eventToEnd.save();
+
+        // Atualiza o DKP dos participantes
+        const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
+        const bulkOperations = participants.map(participant => ({
+            updateOne: {
+                filter: { guildId, userId: participant.userId },
+                update: {
+                    $inc: { points: dkpParameter.points },
+                    $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Event ${eventCode} ended` } }
+                },
+                upsert: true // Garante que novos documentos sejam criados se não existirem
+            }
+        }));
+
+        if (bulkOperations.length > 0) {
+            await Dkp.bulkWrite(bulkOperations);
+            await updateDkpTotal(bulkOperations.length * dkpParameter.points, guildId);
+        }
+
+        const participantMentions = participants.map(participant => `<@${participant.userId}>`).join(', ');
+        const participantCount = participants.length;
+
+        await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after ${eventTimer} minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
+        await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
+        await refreshEligibleUsersCache(guildId); // Atualiza o cache de usuários elegíveis
+        await refreshDkpRankingCache(guildId);
+
+        console.log(`Event with code ${eventCode} for guild ${guildId} has been ended.`);
+        clearEventParticipantsCache(guildId, eventCode); // Limpa o cache de participantes
+        removeActiveEventFromCache(guildId, eventCode); // Remove o evento ativo do cache
     });
 }
 
