@@ -1,3 +1,5 @@
+// channelUtils.js
+
 const ChannelConfig = require('../schema/ChannelConfig');
 const { createInfoEmbed } = require('./embeds');
 

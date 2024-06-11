@@ -24,13 +24,11 @@ function createMultipleResultsEmbed(color, title, descriptions) {
     const maxFieldLength = 1024;
 
     let currentFieldLines = [];
-    let fieldCount = 0;
 
-    descriptions.forEach((desc, index) => {
+    descriptions.forEach((desc) => {
         if ((currentFieldLines.join('\n').length + desc.length > maxFieldLength) || currentFieldLines.length >= maxLinesPerField) {
             embed.addFields({ name: '\u200B', value: currentFieldLines.join('\n'), inline: true });
             currentFieldLines = [];
-            fieldCount++;
         }
         currentFieldLines.push(`${desc}`);
     });

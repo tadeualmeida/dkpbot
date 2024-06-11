@@ -9,7 +9,7 @@ const {
     refreshDkpRankingCache, 
     getDkpRankingFromCache 
 } = require('../utils/cacheManagement');
-const { createDkpBalanceEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
+const { createMultipleResultsEmbed, createInfoEmbed } = require('../utils/embeds');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
@@ -158,8 +158,16 @@ async function handleDkpRank(interaction, guildId) {
             return `${index + 1}. **${userName}** - ${dkp.points} points`;
         });
 
-        const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Ranking - TOP 50', descriptions);
-        await interaction.editReply({ embeds: [resultsEmbed] });
+        const embeds = [];
+        const chunkSize = 50;
+
+        for (let i = 0; i < descriptions.length; i += chunkSize) {
+            const chunk = descriptions.slice(i, i + chunkSize);
+            const embed = createMultipleResultsEmbed('info', `DKP Ranking - ${i + 1} to ${i + chunk.length}`, chunk);
+            embeds.push(embed);
+        }
+
+        await interaction.editReply({ embeds });
     } catch (error) {
         console.error('Failed to retrieve DKP rankings:', error);
         await interaction.editReply({ content: 'Failed to retrieve DKP rankings due to an error.' });
