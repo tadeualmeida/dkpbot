@@ -1,3 +1,5 @@
+// dkpCommands.js
+
 const { 
     getGuildCache, 
     getDkpPointsFromCache, 
@@ -57,6 +59,7 @@ async function handleDkpBalance(interaction, guildId, userDkp) {
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');
+    const descriptionInput = interaction.options.getString('description');
     const executingUser = validator.escape(interaction.user.username);
 
     if (!userIDsInput) {
@@ -98,12 +101,14 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
                 pointChange = -userDkp.points;
             }
 
+            const transactionDescription = `${executingUser} ${isAdd ? 'added' : 'removed'} points${descriptionInput ? `: ${descriptionInput}` : ''}`;
+
             bulkOperations.push({
                 updateOne: {
                     filter: { userId: userID, guildId },
                     update: {
                         $inc: { points: pointChange },
-                        $push: { transactions: { type: isAdd ? 'add' : 'remove', amount: pointChange, description: `${executingUser} ${isAdd ? 'added' : 'removed'} points` } }
+                        $push: { transactions: { type: isAdd ? 'add' : 'remove', amount: pointChange, description: transactionDescription } }
                     },
                     upsert: true
                 }
@@ -126,6 +131,10 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
         await refreshDkpPointsCache(guildId);
         await refreshEligibleUsersCache(guildId);
         await refreshDkpRankingCache(guildId);
+    }
+
+    if (descriptionInput) {
+        descriptions.push(`\nReason: **${descriptionInput}**`);
     }
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
