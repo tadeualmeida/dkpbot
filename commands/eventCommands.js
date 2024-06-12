@@ -19,7 +19,8 @@ const {
     refreshDkpRankingCache,
     addActiveEventToCache,
     removeActiveEventFromCache,
-    getActiveEventsFromCache
+    getActiveEventsFromCache,
+    getGuildConfigFromCache
 } = require('../utils/cacheManagement');
 const { generateRandomCode } = require('../utils/codeGenerator');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
@@ -52,7 +53,7 @@ async function startEvent(interaction) {
     const parameterName = validator.escape(interaction.options.getString('parameter'));
     const guildId = interaction.guildId;
     const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
-    const eventTimer = await getEventTimerFromCache(guildId); // Get the event timer from cache
+    const eventTimer = await getEventTimerFromCache(guildId);
 
     if (!dkpParameter) {
         await interaction.reply({ embeds: [createErrorEmbed(`No DKP parameter found with name '${parameterName}'. Please define it first using '/config dkp'.`)], ephemeral: true });
@@ -82,7 +83,6 @@ async function startEvent(interaction) {
     await newEvent.save();
     addActiveEventToCache(guildId, newEvent);
 
-    // Adiciona o iniciador do evento ao cache de participantes
     addParticipantToEventCache(guildId, eventCode, {
         userId,
         username: userDisplayName,
@@ -92,10 +92,19 @@ async function startEvent(interaction) {
 
     await scheduleEventEnd(eventCode, parameterName, guildId, interaction, eventTimer);
 
-    const combinedEventEmbed = createCombinedEventEmbed(parameterName, eventCode, dkpParameter, { points: totalPoints });
+    const guildConfig = await getGuildConfigFromCache(guildId);
+    const combinedEventEmbed = createCombinedEventEmbed(parameterName, eventCode, dkpParameter, { points: totalPoints }, guildConfig);
+
+    let message;
+    if (guildConfig && guildConfig.guildName) {
+        const guildName = guildConfig.guildName.toUpperCase();
+        message = `User <@${userId}> has started an event with parameter **${parameterName}**.\n\n${guildName} CODE: **${eventCode}**`;
+    } else {
+        message = `User <@${userId}> has started an event with parameter **${parameterName}**.\n\nEvent code: **${eventCode}**`;
+    }
 
     await interaction.reply({ embeds: [combinedEventEmbed], ephemeral: true });
-    await sendMessageToConfiguredChannels(interaction, `User <@${userId}> has started an event with parameter **${parameterName}**.\nEvent code: **${eventCode}**.`, 'event');
+    await sendMessageToConfiguredChannels(interaction, message, 'event');
 }
 
 async function endEvent(interaction) {
@@ -123,7 +132,7 @@ async function endEvent(interaction) {
                 $inc: { points: dkpParameter.points },
                 $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Event ${eventCodeToEnd} ended` } }
             },
-            upsert: true // Garante que novos documentos sejam criados se não existirem
+            upsert: true
         }
     }));
 
@@ -137,7 +146,7 @@ async function endEvent(interaction) {
 
     await interaction.reply({ embeds: [createEventEndedEmbed()], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `User <@${interaction.user.id}> has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
-    await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
+    await refreshDkpPointsCache(guildId);
     await refreshDkpRankingCache(guildId);
 
     clearEventParticipantsCache(guildId, eventCodeToEnd);
@@ -164,7 +173,7 @@ async function cancelEvent(interaction) {
 
     await interaction.reply({ embeds: [createInfoEmbed('Event Canceled', `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`)], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled by <@${interaction.user.id}>.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
-    await refreshDkpPointsCache(guildId); // Atualiza o cache após o cancelamento do evento
+    await refreshDkpPointsCache(guildId);
     await refreshDkpRankingCache(guildId);
 
     clearEventParticipantsCache(guildId, eventCode);

@@ -1,6 +1,15 @@
 // configCommands.js
 
-const { getGuildCache, refreshDkpParametersCache, refreshDkpMinimumCache, getDkpMinimumFromCache, getChannelsFromCache, getEventTimerFromCache, refreshEventTimerCache } = require('../utils/cacheManagement');
+const { 
+    getGuildCache, 
+    refreshDkpParametersCache, 
+    refreshDkpMinimumCache, 
+    getDkpMinimumFromCache, 
+    getChannelsFromCache, 
+    getEventTimerFromCache, 
+    refreshEventTimerCache, 
+    refreshGuildConfigCache 
+} = require('../utils/cacheManagement');
 const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
@@ -8,6 +17,7 @@ const DkpMinimum = require('../schema/DkpMinimum');
 const RoleConfig = require('../schema/RoleConfig');
 const EventTimer = require('../schema/EventTimer');
 const validator = require('validator');
+const GuildConfig = require('../schema/GuildConfig');
 
 async function handleConfigCommands(interaction) {
     const guildId = interaction.guildId;
@@ -29,6 +39,10 @@ async function handleConfigCommands(interaction) {
         case 'event':
             await handleConfigEvent(interaction, guildId);
             break;
+        case 'guildname':
+            await handleSetGuildName(interaction, guildId);
+            break;
+            
     }
 }
 
@@ -149,7 +163,7 @@ async function handleConfigEvent(interaction, guildId) {
             { new: true, upsert: true }
         );
 
-        await refreshEventTimerCache(guildId); // Atualiza o cache do timeout do evento
+        await refreshEventTimerCache(guildId);
 
         await interaction.reply({ embeds: [createInfoEmbed('Event Timeout Set', `Event timeout set to ${minutes} minutes successfully.`)], ephemeral: true });
     }
@@ -166,13 +180,31 @@ async function handleSetRoleCommand(interaction, guildId) {
             { upsert: true }
         );
 
-        // Atualiza o cache
         await refreshRoleConfigCache(guildId);
 
         await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
     } catch (error) {
         console.error('Error setting role:', error);
         await interaction.reply({ embeds: [createErrorEmbed('Failed to set role due to an error.')], ephemeral: true });
+    }
+}
+
+async function handleSetGuildName(interaction, guildId) {
+    const guildName = interaction.options.getString('name');
+
+    try {
+        await GuildConfig.updateOne(
+            { guildId },
+            { $set: { guildName } },
+            { upsert: true }
+        );
+
+        await refreshGuildConfigCache(guildId);
+
+        await interaction.reply({ embeds: [createInfoEmbed('Guild Name Set', `The guild name has been set to **${guildName}**.`)], ephemeral: true });
+    } catch (error) {
+        console.error('Error setting guild name:', error);
+        await interaction.reply({ embeds: [createErrorEmbed('Failed to set guild name due to an error.')], ephemeral: true });
     }
 }
 

@@ -1,3 +1,5 @@
+// configCommands.js
+
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const configCommand = new SlashCommandBuilder()
@@ -91,6 +93,15 @@ const configCommand = new SlashCommandBuilder()
             .addIntegerOption(option =>
                 option.setName('minutes')
                     .setDescription('Enter the timer duration in minutes.')
+                    .setRequired(true))
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('guildname')
+            .setDescription('Set the guild name.')
+            .addStringOption(option =>
+                option.setName('name')
+                    .setDescription('Enter the guild name.')
                     .setRequired(true))
     );
 

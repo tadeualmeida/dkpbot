@@ -1,3 +1,5 @@
+// embeds.js
+
 const { EmbedBuilder } = require('discord.js');
 
 const COLORS = {
@@ -91,9 +93,15 @@ function createEventStartedEmbed(parameterName, eventCode) {
     return createEmbed({ color: 'info', title: 'Event Started', description });
 }
 
-function createCombinedEventEmbed(parameterName, eventCode, dkpParameter, userDkp) {
+function createCombinedEventEmbed(parameterName, eventCode, dkpParameter, userDkp, guildConfig) {
     const pointText = dkpParameter.points > 1 ? 'points' : 'point';
-    const description = `An event has started with DKP parameter: ${parameterName}\n\nEvent code: **${eventCode}**\n\nYou have been automatically added to the event and earned **${dkpParameter.points}** ${pointText}. Your total will be updated to **${userDkp.points}** after the event ends.`;
+    let description = `An event has started with DKP parameter: ${parameterName}\n\nEvent code: **${eventCode}**\n\nYou have been automatically added to the event and earned **${dkpParameter.points}** ${pointText}. Your total will be updated to **${userDkp.points}** after the event ends.`;
+
+    if (guildConfig && guildConfig.guildName) {
+        const guildName = guildConfig.guildName.toUpperCase();
+        description = `An event has started with DKP parameter: ${parameterName}\n\n${guildName} CODE: **${eventCode}**\n\nYou have been automatically added to the event and earned **${dkpParameter.points}** ${pointText}. Your total will be updated to **${userDkp.points}** after the event ends.`;
+    }
+
     return createEmbed({ color: 'info', title: 'Event Started and Joined', description });
 }
 

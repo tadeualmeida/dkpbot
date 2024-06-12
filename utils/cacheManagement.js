@@ -7,8 +7,8 @@ const DkpMinimum = require('../schema/DkpMinimum');
 const GuildBank = require('../schema/GuildBank');
 const ChannelConfig = require('../schema/ChannelConfig');
 const EventTimer = require('../schema/EventTimer');
-const Event = require('../schema/Event');
 const RoleConfig = require('../schema/RoleConfig');
+const GuildConfig = require('../schema/GuildConfig');
 
 const guildCaches = new Map();
 
@@ -242,6 +242,16 @@ async function getRoleConfigFromCache(guildId) {
     return roleConfig;
 }
 
+async function refreshGuildConfigCache(guildId) {
+    await refreshCache(guildId, GuildConfig, 'guildConfig', {}, results => {
+        return results.length ? results[0] : {};
+    });
+}
+
+async function getGuildConfigFromCache(guildId) {
+    return await getFromCache(guildId, 'guildConfig', GuildConfig, {});
+}
+
 module.exports = { 
     refreshDkpParametersCache, 
     getDkpParameterFromCache, 
@@ -267,5 +277,8 @@ module.exports = {
     refreshDkpRankingCache,
     getDkpRankingFromCache,
     refreshRoleConfigCache,
-    getRoleConfigFromCache
+    getRoleConfigFromCache,
+    refreshGuildConfigCache,
+    getGuildConfigFromCache
+
 };

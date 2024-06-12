@@ -11,7 +11,8 @@ const {
     refreshEventTimerCache,
     refreshEligibleUsersCache,
     refreshDkpRankingCache,
-    refreshRoleConfigCache // Adicionado refreshRoleConfigCache
+    refreshRoleConfigCache,
+    refreshGuildConfigCache
 } = require('../utils/cacheManagement');
 const { clearEmptyEvents } = require('../utils/clearEmptyEvents');
 const { 
@@ -30,7 +31,8 @@ async function refreshAllCaches(guildId) {
         refreshEventTimerCache(guildId), 
         refreshEligibleUsersCache(guildId),
         refreshDkpRankingCache(guildId),
-        refreshRoleConfigCache(guildId) // Adicionado refreshRoleConfigCache
+        refreshRoleConfigCache(guildId),
+        refreshGuildConfigCache(guildId)
     ]);
     console.log(`All caches refreshed for guild: ${guildId}`);
 }

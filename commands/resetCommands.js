@@ -3,7 +3,7 @@
 const Event = require('../schema/Event');
 const GuildBank = require('../schema/GuildBank');
 const { Dkp, DkpTotal } = require('../schema/Dkp');
-const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache, refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, refreshEligibleUsersCache } = require('../utils/cacheManagement');
+const { refreshDkpParametersCache, clearCache, refreshDkpPointsCache, refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, refreshEligibleUsersCache, refreshDkpRankingCache } = require('../utils/cacheManagement');
 const { createInfoEmbed } = require('../utils/embeds');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
