@@ -192,8 +192,15 @@ async function joinEvent(interaction) {
         return;
     }
 
-    if (event.participants.some(p => p.userId === interaction.user.id)) {
+    const participants = getEventParticipantsFromCache(guildId, eventCode);
+
+    if (participants.some(p => p.userId === interaction.user.id)) {
         await interaction.reply({ embeds: [createErrorEmbed('You have already joined this event.')], ephemeral: true });
+        return;
+    }
+
+    if (participants[0].userId === interaction.user.id) {
+        await interaction.reply({ embeds: [createErrorEmbed('You have already joined the event you created.')], ephemeral: true });
         return;
     }
 
