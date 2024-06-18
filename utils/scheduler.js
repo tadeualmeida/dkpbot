@@ -1,3 +1,5 @@
+// scheduler.js
+
 const schedule = require('node-schedule');
 const { 
     refreshDkpPointsCache, 
@@ -6,29 +8,26 @@ const {
     clearEventParticipantsCache, 
     getDkpParameterFromCache, 
     refreshDkpRankingCache,
-    addActiveEventToCache,
     removeActiveEventFromCache
 } = require('./cacheManagement');
 const Event = require('../schema/Event');
 const { sendMessageToConfiguredChannels } = require('./channelUtils');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
+const { createBulkOperations } = require('./generalUtils');
 
 const scheduledJobs = new Map();
 
 async function scheduleJob(guildId, jobId, duration, callback) {
     const jobKey = `${guildId}-${jobId}`;
-    const job = schedule.scheduleJob(Date.now() + duration * 60000, async function () {
+    const job = schedule.scheduleJob(Date.now() + duration * 60000, async () => {
         try {
             await callback();
         } catch (error) {
             console.error(`Error executing job ${jobKey}:`, error);
         } finally {
-            // Remove o job do mapa
             scheduledJobs.delete(jobKey);
         }
     });
-
-    // Armazena o job agendado no mapa
     scheduledJobs.set(jobKey, job);
 }
 
@@ -40,8 +39,6 @@ function cancelScheduledJob(guildId, jobId) {
         scheduledJobs.delete(jobKey);
         console.log(`Scheduled job ${jobKey} cancelled.`);
     }
-
-    // Remove o evento ativo do cache e limpa o cache de participantes
     removeActiveEventFromCache(guildId, jobId);
     clearEventParticipantsCache(guildId, jobId);
 }
@@ -58,40 +55,29 @@ async function scheduleEventEnd(eventCode, parameterName, guildId, interaction, 
         }
 
         const participants = getEventParticipantsFromCache(guildId, eventCode);
-
         eventToEnd.participants = participants;
         eventToEnd.isActive = false;
         await eventToEnd.save();
 
-        // Atualiza o DKP dos participantes
         const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
-        const bulkOperations = participants.map(participant => ({
-            updateOne: {
-                filter: { guildId, userId: participant.userId },
-                update: {
-                    $inc: { points: dkpParameter.points },
-                    $push: { transactions: { type: 'add', amount: dkpParameter.points, description: `Event ${eventCode} ended` } }
-                },
-                upsert: true // Garante que novos documentos sejam criados se não existirem
-            }
-        }));
+        const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCode} ended`);
 
         if (bulkOperations.length > 0) {
             await Dkp.bulkWrite(bulkOperations);
             await updateDkpTotal(bulkOperations.length * dkpParameter.points, guildId);
         }
 
-        const participantMentions = participants.map(participant => `<@${participant.userId}>`).join(', ');
+        const participantMentions = participants.map(participant => participant.username).join('**, **');
         const participantCount = participants.length;
 
-        await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after ${eventTimer} minutes.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
-        await refreshDkpPointsCache(guildId); // Atualiza o cache após o término do evento
-        await refreshEligibleUsersCache(guildId); // Atualiza o cache de usuários elegíveis
+        await sendMessageToConfiguredChannels(interaction, `The event with parameter **${parameterName}** and code **${eventCode}** has ended after ${eventTimer} minutes.\nParticipants (${participantCount}): **${participantMentions || 'No participants.'}**`, 'event');
+        await refreshDkpPointsCache(guildId);
+        await refreshEligibleUsersCache(guildId);
         await refreshDkpRankingCache(guildId);
 
         console.log(`Event with code ${eventCode} for guild ${guildId} has been ended.`);
-        clearEventParticipantsCache(guildId, eventCode); // Limpa o cache de participantes
-        removeActiveEventFromCache(guildId, eventCode); // Remove o evento ativo do cache
+        clearEventParticipantsCache(guildId, eventCode);
+        removeActiveEventFromCache(guildId, eventCode);
     });
 }
 
