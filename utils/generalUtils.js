@@ -7,9 +7,16 @@ function isPositiveInteger(value) {
 }
 
 function createBulkOperations(participants, guildId, dkpPoints, description) {
+    if (!Array.isArray(participants)) {
+        throw new TypeError("participants must be an array");
+    }
     if (typeof dkpPoints !== 'number') {
         throw new TypeError("dkpPoints must be a number");
     }
+    if (!description) {
+        throw new Error("description is required");
+    }
+
     return participants.map(participant => ({
         updateOne: {
             filter: { guildId, userId: participant.userId },
@@ -36,7 +43,7 @@ async function fetchUserToModify(userID, interaction) {
 }
 
 async function getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, getDkpPointsFromCache, getGuildCache) {
-    const pointChange = isAdd ? pointsToModify : -pointsToModify;
+    let pointChange = isAdd ? pointsToModify : -pointsToModify;
     const userDkp = await getDkpPointsFromCache(guildId, userID) || await Dkp.create({ userId: userID, guildId, points: 0 });
     if (!isAdd && userDkp.points + pointChange < 0) {
         pointChange = -userDkp.points;
