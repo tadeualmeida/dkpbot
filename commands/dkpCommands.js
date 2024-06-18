@@ -9,7 +9,7 @@ const {
     refreshDkpRankingCache, 
     getDkpRankingFromCache 
 } = require('../utils/cacheManagement');
-const { createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
+const { createMultipleResultsEmbed, createInfoEmbed } = require('../utils/embeds');
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
@@ -58,15 +58,13 @@ function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
 }
 
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
-    await interaction.deferReply({ ephemeral: true });
-
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');
     const descriptionInput = interaction.options.getString('description');
     const executingUser = validator.escape(interaction.user.username);
 
     if (!userIDsInput) {
-        await interaction.editReply({ content: "You must specify at least one user ID." });
+        await interaction.reply({ content: "You must specify at least one user ID.", ephemeral: true });
         return;
     }
 
@@ -74,7 +72,7 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
     const descriptions = await modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, isAdd, descriptionInput, executingUser);
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
-    await interaction.editReply({ embeds: [resultsEmbed], ephemeral: true });
+    await interaction.reply({ embeds: [resultsEmbed], ephemeral: true });
 
     const actionText = isAdd ? 'added points to' : 'removed points from';
     const executorName = interaction.member ? interaction.member.displayName : executingUser;
@@ -115,7 +113,7 @@ async function modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, is
     }
 
     if (participants.length > 0) {
-        const bulkOperations = createBulkOperations(participants, guildId);
+        const bulkOperations = createBulkOperations(participants, guildId, pointsToModify, executingUser);
         await Dkp.bulkWrite(bulkOperations);
         await updateDkpTotal(totalPointsModified, guildId);
         await refreshDkpPointsCache(guildId);
