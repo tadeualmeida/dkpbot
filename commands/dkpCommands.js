@@ -58,13 +58,15 @@ function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
 }
 
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
+    await interaction.deferReply({ ephemeral: true }); // Adicionando deferReply
+
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');
     const descriptionInput = interaction.options.getString('description');
     const executingUser = validator.escape(interaction.user.username);
 
     if (!userIDsInput) {
-        await interaction.reply({ content: "You must specify at least one user ID.", ephemeral: true });
+        await interaction.editReply({ content: "You must specify at least one user ID.", ephemeral: true });
         return;
     }
 
@@ -72,7 +74,7 @@ async function handleDkpAddRemove(interaction, guildId, isAdd) {
     const descriptions = await modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, isAdd, descriptionInput, executingUser);
 
     const resultsEmbed = createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions);
-    await interaction.reply({ embeds: [resultsEmbed], ephemeral: true });
+    await interaction.editReply({ embeds: [resultsEmbed], ephemeral: true });
 
     const actionText = isAdd ? 'added points to' : 'removed points from';
     const executorName = interaction.member ? interaction.member.displayName : executingUser;
