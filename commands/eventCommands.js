@@ -1,5 +1,3 @@
-// eventCommands.js
-
 const validator = require('validator');
 const {
     createCombinedEventEmbed,
@@ -108,6 +106,11 @@ async function endEvent(interaction) {
     await Event.updateOne({ guildId, code: eventCodeToEnd }, { $set: { isActive: false, participants } });
 
     const dkpParameter = await getDkpParameterFromCache(guildId, eventToEnd.parameterName);
+    if (!dkpParameter || typeof dkpParameter.points !== 'number') {
+        await replyWithError(interaction, "Invalid DKP parameter points.");
+        return;
+    }
+
     const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCodeToEnd} ended`);
 
     if (bulkOperations.length > 0) {

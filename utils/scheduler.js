@@ -1,5 +1,3 @@
-// scheduler.js
-
 const schedule = require('node-schedule');
 const { 
     refreshDkpPointsCache, 
@@ -60,8 +58,12 @@ async function scheduleEventEnd(eventCode, parameterName, guildId, interaction, 
         await eventToEnd.save();
 
         const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
-        const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCode} ended`);
+        if (!dkpParameter || typeof dkpParameter.points !== 'number') {
+            console.error(`DKP parameter points for ${parameterName} is invalid or undefined.`);
+            return;
+        }
 
+        const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCode} ended`);
         if (bulkOperations.length > 0) {
             await Dkp.bulkWrite(bulkOperations);
             await updateDkpTotal(bulkOperations.length * dkpParameter.points, guildId);

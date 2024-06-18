@@ -6,16 +6,16 @@ function isPositiveInteger(value) {
     return validator.isInt(value.toString(), { min: 1 });
 }
 
-function createBulkOperations(participants, guildId) {
-    if (!Array.isArray(participants)) {
-        throw new TypeError("participants must be an array");
+function createBulkOperations(participants, guildId, dkpPoints, description) {
+    if (typeof dkpPoints !== 'number') {
+        throw new TypeError("dkpPoints must be a number");
     }
     return participants.map(participant => ({
         updateOne: {
             filter: { guildId, userId: participant.userId },
             update: {
-                $inc: { points: participant.pointChange },
-                $push: { transactions: { type: participant.pointChange > 0 ? 'add' : 'remove', amount: participant.pointChange, description: participant.transactionDescription } }
+                $inc: { points: dkpPoints },
+                $push: { transactions: { type: 'add', amount: dkpPoints, description } }
             },
             upsert: true
         }
