@@ -194,7 +194,6 @@ async function joinEvent(interaction) {
     await interaction.reply({ embeds: [joinEventEmbed], ephemeral: true });
 }
 
-
 async function listEvent(interaction) {
     const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
