@@ -2,6 +2,7 @@
 
 const { handleInteractionCreate } = require('./interactionCreate');
 const { registerCommands } = require('../utils/registerCommands');
+const { handleMessageCreate } = require('./messageHandler');
 const { 
     refreshDkpParametersCache, 
     clearCache, 
@@ -76,6 +77,7 @@ function setupEventHandlers(client) {
     });
 
     client.on('interactionCreate', handleInteractionCreate);
+    client.on('messageCreate', handleMessageCreate);
 }
 
 module.exports = setupEventHandlers;

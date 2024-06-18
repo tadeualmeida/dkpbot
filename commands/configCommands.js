@@ -42,7 +42,6 @@ async function handleConfigCommands(interaction) {
         case 'guildname':
             await handleSetGuildName(interaction, guildId);
             break;
-            
     }
 }
 
