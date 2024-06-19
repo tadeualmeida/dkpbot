@@ -18,7 +18,8 @@ async function handleInteractionCreate(interaction) {
                 }
                 break;
             case 'config':
-                if (subcommand === 'dkp' && focusedName === 'name') {
+                const action = interaction.options.getString('action');
+                if (subcommand === 'dkp' && focusedName === 'name' && (action === 'remove' || action === 'edit')) {
                     await handleDkpParameterAutocomplete(interaction, guildId, search);
                 }
                 break;

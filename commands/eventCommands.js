@@ -31,7 +31,7 @@ const { createBulkOperations, fetchUserToModify } = require('../utils/generalUti
 async function handleEventCommands(interaction) {
     try {
         if (interaction.commandName === 'event') {
-            const subcommand = interaction.options.getSubcommand(false); // Use getSubcommand(false) to avoid throwing an error if no subcommand is specified
+            const subcommand = interaction.options.getSubcommand(false);
             if (!subcommand) {
                 await interaction.reply({ embeds: [createErrorEmbed('No subcommand specified.')]});
                 return;
@@ -52,6 +52,8 @@ async function handleEventCommands(interaction) {
 }
 
 async function startEvent(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
     const parameterName = validator.escape(interaction.options.getString('parameter'));
     const guildId = interaction.guildId;
     const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
@@ -86,11 +88,13 @@ async function startEvent(interaction) {
     const guildName = guildConfig?.guildName ? guildConfig.guildName.toUpperCase() : 'Event';
     const message = `User **${userDisplayName}** has started an event with parameter **${parameterName}**.\n\n${guildName} CODE: **${eventCode}**`;
 
-    await interaction.reply({ embeds: [combinedEventEmbed], ephemeral: true });
+    await interaction.editReply({ embeds: [combinedEventEmbed], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, message, 'event');
 }
 
 async function endEvent(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
     const eventCodeToEnd = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
 
@@ -121,7 +125,7 @@ async function endEvent(interaction) {
     const participantMentions = participants.map(participant => participant.username).join('**, **');
     const participantCount = participants.length;
 
-    await interaction.reply({ embeds: [createEventEndedEmbed()], ephemeral: true });
+    await interaction.editReply({ embeds: [createEventEndedEmbed()], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `User **${interaction.member.displayName}** has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): **${participantMentions || 'No participants.'}**`, 'event');
     await refreshDkpPointsCache(guildId);
     await refreshDkpRankingCache(guildId);
@@ -132,6 +136,8 @@ async function endEvent(interaction) {
 }
 
 async function cancelEvent(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
     const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
     const guildId = interaction.guildId;
 
@@ -147,7 +153,7 @@ async function cancelEvent(interaction) {
     const participantMentions = eventToCancel.participants.map(participant => participant.username).join(', ');
     const participantCount = eventToCancel.participants.length;
 
-    await interaction.reply({ embeds: [createInfoEmbed('Event Canceled', `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`)], ephemeral: true });
+    await interaction.editReply({ embeds: [createInfoEmbed('Event Canceled', `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`)], ephemeral: true });
     await sendMessageToConfiguredChannels(interaction, `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled by **${interaction.member.displayName}**.\nParticipants (${participantCount}): ${participantMentions || 'No participants.'}`, 'event');
     await refreshDkpPointsCache(guildId);
     await refreshDkpRankingCache(guildId);
@@ -158,6 +164,8 @@ async function cancelEvent(interaction) {
 }
 
 async function joinEvent(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
     const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
     const guildId = interaction.guildId;
 
@@ -194,27 +202,29 @@ async function joinEvent(interaction) {
 
     const joinEventEmbed = createJoinEventEmbed(dkpParameter, { points: totalPoints }, eventCode);
 
-    await interaction.reply({ embeds: [joinEventEmbed], ephemeral: true });
+    await interaction.editReply({ embeds: [joinEventEmbed], ephemeral: true });
 }
 
 async function listEvent(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+
     const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
 
     const event = getActiveEventsFromCache(guildId).find(event => event.code === eventCode) || await Event.findOne({ guildId, code: eventCode });
     if (!event) {
-        await interaction.reply({ content: `Event with code ${eventCode} not found.`, ephemeral: true });
+        await interaction.editReply({ content: `Event with code ${eventCode} not found.`, ephemeral: true });
         return;
     }
 
     const participants = getEventParticipantsFromCache(guildId, eventCode).length > 0 ? getEventParticipantsFromCache(guildId, eventCode) : event.participants;
     const descriptions = participants.map(p => `${p.username}`);
 
-    await interaction.reply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, descriptions)], ephemeral: true });
+    await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, descriptions)], ephemeral: true });
 }
 
 async function replyWithError(interaction, message) {
-    await interaction.reply({ embeds: [createErrorEmbed(message)], ephemeral: true });
+    await interaction.editReply({ embeds: [createErrorEmbed(message)], ephemeral: true });
 }
 
 module.exports = { handleEventCommands };
