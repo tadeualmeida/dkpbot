@@ -1,5 +1,3 @@
-// resetCommands.js
-
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Event = require('../schema/Event');
 const GuildBank = require('../schema/GuildBank');
@@ -9,8 +7,9 @@ const {
     refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, 
     refreshEligibleUsersCache, refreshDkpRankingCache 
 } = require('../utils/cacheManagement');
-const { createInfoEmbed, createErrorEmbed2 } = require('../utils/embeds');
+const { createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
+const { replyWithError } = require('../utils/generalUtils');
 
 async function handleResetCommand(interaction) {
     const guildId = interaction.guildId;
@@ -28,7 +27,7 @@ async function handleResetCommand(interaction) {
 
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
-    const embed = createErrorEmbed2(
+    const embed = createErrorEmbed(
         'Reset Info',
         '**Are you sure you want to reset all DKP points, events, and crows? This action is irreversible.**'
     );
@@ -45,18 +44,18 @@ async function handleResetCommand(interaction) {
     collector.on('collect', async i => {
         if (i.customId === 'confirm_reset') {
             await resetGuildData(guildId);
-            const resetCompleteEmbed = createInfoEmbed('Reset Complete', `All DKP points, events, and crows have been reset for this guild.`);
+            const resetCompleteEmbed = createInfoEmbed('Reset Complete',`All DKP points, events, and crows have been reset for this guild`);
             await sendMessageToConfiguredChannels(interaction, `All DKP points, events, and crows have been reset for this guild by **${userName}**.`, 'dkp');
             await i.update({ embeds: [resetCompleteEmbed], components: [], ephemeral: true });
         } else if (i.customId === 'cancel_reset') {
-            const resetCancelledEmbed = createInfoEmbed('Reset Cancelled', 'The reset operation has been cancelled.');
+            const resetCancelledEmbed = createInfoEmbed('Reset Cancelled','The reset operation has been cancelled.');
             await i.update({ embeds: [resetCancelledEmbed], components: [], ephemeral: true });
         }
     });
 
     collector.on('end', collected => {
         if (collected.size === 0) {
-            const timeoutEmbed = createErrorEmbed2('Reset Timed Out', 'Reset timed out. No action taken.');
+            const timeoutEmbed = createInfoEmbed('Reset Timeout', 'Reset timed out. No action taken.');
             interaction.editReply({ embeds: [timeoutEmbed], components: [], ephemeral: true });
         }
     });

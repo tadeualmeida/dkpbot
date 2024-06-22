@@ -1,5 +1,3 @@
-// configCommands.js
-
 const { 
     getGuildCache, 
     refreshDkpParametersCache, 
@@ -11,6 +9,7 @@ const {
     refreshGuildConfigCache 
 } = require('../utils/cacheManagement');
 const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
+const { replyWithError } = require('../utils/generalUtils');
 const DkpParameter = require('../schema/DkParameter');
 const ChannelConfig = require('../schema/ChannelConfig');
 const DkpMinimum = require('../schema/DkpMinimum');
@@ -50,14 +49,14 @@ async function handleConfigDkp(interaction, guildId) {
     const name = interaction.options.getString('name') ? validator.escape(interaction.options.getString('name').toLowerCase()) : null;
     
     if ((action === 'remove' || action === 'edit') && !name) {
-        await interaction.reply({ embeds: [createErrorEmbed("Parameter name is required for remove and edit actions.")], ephemeral: true });
+        await replyWithError(interaction, null, "Parameter name is required for remove and edit actions.");
         return;
     }
 
     if (action === 'add' || action === 'edit') {
         const points = interaction.options.getInteger('points');
         if (points == null) {
-            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid points value.")], ephemeral: true });
+            await replyWithError(interaction, null, "You must specify a valid points value.");
             return;
         }
         const updatedParameter = await DkpParameter.findOneAndUpdate(
@@ -75,7 +74,7 @@ async function handleConfigDkp(interaction, guildId) {
     } else if (action === 'minimum') {
         const minimumPoints = interaction.options.getInteger('points');
         if (minimumPoints == null) {
-            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid minimum points value.")], ephemeral: true });
+            await replyWithError(interaction, null, "You must specify a valid minimum points value.");
             return;
         }
         await DkpMinimum.findOneAndUpdate(
@@ -96,7 +95,7 @@ async function handleConfigChannel(interaction, guildId) {
     if (action === 'add') {
         if (existingConfig) {
             if (existingConfig.channels.includes(channel.id)) {
-                await interaction.reply({ embeds: [createErrorEmbed('This channel is already added.')], ephemeral: true });
+                await replyWithError(interaction, null, 'This channel is already added.');
                 return;
             }
             existingConfig.channels.push(channel.id);
@@ -108,7 +107,7 @@ async function handleConfigChannel(interaction, guildId) {
         await interaction.reply({ embeds: [createInfoEmbed('Channel Added', `Channel <#${channel.id}> added successfully.`)], ephemeral: true });
     } else if (action === 'remove') {
         if (!existingConfig || !existingConfig.channels.includes(channel.id)) {
-            await interaction.reply({ embeds: [createErrorEmbed('This channel is not configured.')], ephemeral: true });
+            await replyWithError(interaction, null, 'This channel is not configured.');
             return;
         }
         existingConfig.channels = existingConfig.channels.filter(id => id !== channel.id);
@@ -152,7 +151,7 @@ async function handleConfigEvent(interaction, guildId) {
     if (action === 'timer') {
         const minutes = interaction.options.getInteger('minutes');
         if (minutes == null || minutes <= 0) {
-            await interaction.reply({ embeds: [createErrorEmbed("You must specify a valid timeout duration in minutes.")], ephemeral: true });
+            await replyWithError(interaction, null, "You must specify a valid timeout duration in minutes.");
             return;
         }
 
@@ -184,7 +183,7 @@ async function handleSetRoleCommand(interaction, guildId) {
         await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
     } catch (error) {
         console.error('Error setting role:', error);
-        await interaction.reply({ embeds: [createErrorEmbed('Failed to set role due to an error.')], ephemeral: true });
+        await replyWithError(interaction, 'Failed to set role due to an error.', null);
     }
 }
 
@@ -203,7 +202,7 @@ async function handleSetGuildName(interaction, guildId) {
         await interaction.reply({ embeds: [createInfoEmbed('Guild Name Set', `The guild name has been set to **${guildName}**.`)], ephemeral: true });
     } catch (error) {
         console.error('Error setting guild name:', error);
-        await interaction.reply({ embeds: [createErrorEmbed('Failed to set guild name due to an error.')], ephemeral: true });
+        await replyWithError(interaction, 'Failed to set guild name due to an error.', null);
     }
 }
 

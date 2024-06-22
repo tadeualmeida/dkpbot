@@ -1,6 +1,7 @@
 // generalUtils.js
 
 const validator = require('validator');
+const { createErrorEmbed } = require('./embeds');
 
 function isPositiveInteger(value) {
     return validator.isInt(value.toString(), { min: 1 });
@@ -53,4 +54,12 @@ async function getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, ge
     return { pointChange, userDkp };
 }
 
-module.exports = { isPositiveInteger, createBulkOperations, fetchGuildMember, fetchUserToModify, getUserDkpChanges };
+async function replyWithError(interaction, title, message) {
+    if (interaction.replied || interaction.deferred) {
+        await interaction.editReply({ embeds: [createErrorEmbed(title, message)], ephemeral: true });
+    } else {
+        await interaction.reply({ embeds: [createErrorEmbed(title, message)], ephemeral: true });
+    }
+}
+
+module.exports = { isPositiveInteger, createBulkOperations, fetchGuildMember, fetchUserToModify, getUserDkpChanges, replyWithError };

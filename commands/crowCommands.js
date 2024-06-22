@@ -1,8 +1,6 @@
-// crowCommands.js
-
 const { createCrowUpdateEmbed, createCrowBalanceEmbed, createErrorEmbed } = require('../utils/embeds');
 const { modifyCrows } = require('../utils/crowManager');
-const { isPositiveInteger, fetchGuildMember } = require('../utils/generalUtils');
+const { isPositiveInteger, fetchGuildMember, replyWithError } = require('../utils/generalUtils');
 const { getDkpMinimumFromCache, getCrowsFromCache, refreshCrowCache, getEligibleUsersFromCache } = require('../utils/cacheManagement');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
@@ -10,21 +8,21 @@ async function handleCrowCommands(interaction) {
     const guildId = interaction.guildId;
     await interaction.deferReply({ ephemeral: true });
 
-    const subcommand = interaction.options.getSubcommand(false); // Use getSubcommand(false) to avoid throwing an error
+    const subcommand = interaction.options.getSubcommand(false);
 
     switch (interaction.commandName) {
         case 'crow':
             if (subcommand === 'add' || subcommand === 'remove') {
                 await handleModifyCrow(interaction, guildId, subcommand === 'add');
             } else {
-                await interaction.editReply({ embeds: [createErrorEmbed("No subcommand specified. Please use 'add' or 'remove'.")] });
+                await replyWithError(interaction, null, "No subcommand specified. Please use 'add' or 'remove'.");
             }
             break;
         case 'bank':
             await handleBank(interaction, guildId);
             break;
         default:
-            await interaction.editReply({ embeds: [createErrorEmbed("Unknown command.")] });
+            await replyWithError(interaction, null, "Unknown command.");
             break;
     }
 }
@@ -33,7 +31,7 @@ async function handleModifyCrow(interaction, guildId, isAdd) {
     const amount = interaction.options.getInteger('amount');
 
     if (!isPositiveInteger(amount)) {
-        await interaction.editReply({ embeds: [createErrorEmbed("The amount must be a positive integer.")] });
+        await replyWithError(interaction, null, "The amount must be a positive integer.");
         return;
     }
 
@@ -48,7 +46,7 @@ async function handleModifyCrow(interaction, guildId, isAdd) {
         await interaction.editReply({ embeds: [createCrowUpdateEmbed(amountToModify, modifiedCrows.crows)] });
     } catch (error) {
         console.error(`Error ${actionText} crows:`, error);
-        await interaction.editReply({ embeds: [createErrorEmbed(`Failed to ${actionText} crows due to an internal error.`)] });
+        await replyWithError(interaction, `Failed to ${actionText} crows due to an internal error.`, null);
     }
 }
 
@@ -64,7 +62,7 @@ async function handleBank(interaction, guildId) {
         await interaction.editReply({ embeds: [createCrowBalanceEmbed(crows, eligibleDkp, crowsPerDkp, additionalDescription)] });
     } catch (error) {
         console.error('Error fetching crows:', error);
-        await interaction.editReply({ embeds: [createErrorEmbed("Failed to fetch the current crow balance.")] });
+        await replyWithError(interaction, "Failed to fetch the current crow balance.", null);
     }
 }
 

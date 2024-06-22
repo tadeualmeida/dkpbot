@@ -117,14 +117,10 @@ function createJoinEventEmbed(dkpParameter, userDkp, eventCode) {
 }
 
 
-function createErrorEmbed2(title, description) {
+function createErrorEmbed(title, description) {
     if (title) {
         return createEmbed({ color: 'error', title, description });
     }
-    return createEmbed({ color: 'error', title: 'Error', description });
-}
-
-function createErrorEmbed(description) {
     return createEmbed({ color: 'error', title: 'Error', description });
 }
 
@@ -144,6 +140,5 @@ module.exports = {
     createJoinEventEmbed,
     createErrorEmbed,
     createInfoEmbed,
-    createCombinedEventEmbed,
-    createErrorEmbed2
+    createCombinedEventEmbed
 };
