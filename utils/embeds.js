@@ -117,7 +117,10 @@ function createJoinEventEmbed(dkpParameter, userDkp, eventCode) {
 }
 
 
-function createErrorEmbed(description) {
+function createErrorEmbed(title, description) {
+    if (title) {
+        return createEmbed({ color: 'error', title, description });
+    }
     return createEmbed({ color: 'error', title: 'Error', description });
 }
 

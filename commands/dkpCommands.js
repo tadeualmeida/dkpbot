@@ -58,7 +58,7 @@ function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
 }
 
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
-    await interaction.deferReply({ ephemeral: true }); // Adicionando deferReply
+    await interaction.deferReply({ ephemeral: true });
 
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');
@@ -135,8 +135,14 @@ async function handleDkpRank(interaction, guildId) {
         await interaction.deferReply({ ephemeral: true });
 
         const dkpRanking = await getDkpRankingFromCache(guildId);
-        const descriptions = await getDkpRankDescriptions(dkpRanking, interaction);
 
+        if (dkpRanking.length === 0) {
+            const noRankingEmbed = createInfoEmbed('No DKP Ranking', 'There is currently no DKP ranking available.');
+            await interaction.editReply({ embeds: [noRankingEmbed], ephemeral: true });
+            return;
+        }
+
+        const descriptions = await getDkpRankDescriptions(dkpRanking, interaction);
         const embeds = createRankEmbeds(descriptions);
 
         await interaction.editReply({ embeds });

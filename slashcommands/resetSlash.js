@@ -1,3 +1,5 @@
+// resetSlash.js
+
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const resetCommand = new SlashCommandBuilder()
