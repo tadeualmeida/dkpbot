@@ -7,15 +7,12 @@ function isPositiveInteger(value) {
     return validator.isInt(value.toString(), { min: 1 });
 }
 
-function createBulkOperations(participants, guildId, dkpPoints, description) {
+function createBulkOperations(participants, guildId, dkpPoints, description = '') {
     if (!Array.isArray(participants)) {
         throw new TypeError("participants must be an array");
     }
     if (typeof dkpPoints !== 'number') {
         throw new TypeError("dkpPoints must be a number");
-    }
-    if (!description) {
-        throw new Error("description is required");
     }
 
     return participants.map(participant => ({
@@ -23,7 +20,7 @@ function createBulkOperations(participants, guildId, dkpPoints, description) {
             filter: { guildId, userId: participant.userId },
             update: {
                 $inc: { points: dkpPoints },
-                $push: { transactions: { type: 'add', amount: dkpPoints, description } }
+                $push: { transactions: { type: dkpPoints > 0 ? 'add' : 'remove', amount: dkpPoints, description } }
             },
             upsert: true
         }

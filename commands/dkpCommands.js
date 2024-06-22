@@ -1,3 +1,5 @@
+// dkpCommands.js
+
 const { 
     getGuildCache, 
     getDkpPointsFromCache, 
@@ -13,7 +15,7 @@ const { createMultipleResultsEmbed, createInfoEmbed } = require('../utils/embeds
 const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
-const { fetchUserToModify, getUserDkpChanges, createBulkOperations } = require('../utils/generalUtils');
+const { fetchUserToModify, getUserDkpChanges, createBulkOperations, replyWithError } = require('../utils/generalUtils');
 
 async function handleDkpCommands(interaction) {
     const guildId = interaction.guildId;
@@ -115,7 +117,7 @@ async function modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, is
     }
 
     if (participants.length > 0) {
-        const bulkOperations = createBulkOperations(participants, guildId, pointsToModify, executingUser);
+        const bulkOperations = createBulkOperations(participants, guildId, isAdd ? pointsToModify : -pointsToModify, descriptionInput || '');
         await Dkp.bulkWrite(bulkOperations);
         await updateDkpTotal(totalPointsModified, guildId);
         await refreshDkpPointsCache(guildId);
