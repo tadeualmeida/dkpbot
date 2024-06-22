@@ -9,7 +9,7 @@ const {
     refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, 
     refreshEligibleUsersCache, refreshDkpRankingCache 
 } = require('../utils/cacheManagement');
-const { createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
+const { createInfoEmbed, createErrorEmbed2 } = require('../utils/embeds');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
 async function handleResetCommand(interaction) {
@@ -28,7 +28,7 @@ async function handleResetCommand(interaction) {
 
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
-    const embed = createErrorEmbed(
+    const embed = createErrorEmbed2(
         'Reset Info',
         '**Are you sure you want to reset all DKP points, events, and crows? This action is irreversible.**'
     );
@@ -56,7 +56,7 @@ async function handleResetCommand(interaction) {
 
     collector.on('end', collected => {
         if (collected.size === 0) {
-            const timeoutEmbed = createErrorEmbed('Reset Timed Out', 'Reset timed out. No action taken.');
+            const timeoutEmbed = createErrorEmbed2('Reset Timed Out', 'Reset timed out. No action taken.');
             interaction.editReply({ embeds: [timeoutEmbed], components: [], ephemeral: true });
         }
     });
