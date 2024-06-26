@@ -1,5 +1,3 @@
-// generalUtils.js
-
 const validator = require('validator');
 const { createErrorEmbed } = require('./embeds');
 
@@ -52,10 +50,12 @@ async function getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, ge
 }
 
 async function replyWithError(interaction, title, message) {
+    const errorEmbed = createErrorEmbed(title, message);
+
     if (interaction.replied || interaction.deferred) {
-        await interaction.editReply({ embeds: [createErrorEmbed(title, message)], ephemeral: true });
+        await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
     } else {
-        await interaction.reply({ embeds: [createErrorEmbed(title, message)], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
     }
 }
 

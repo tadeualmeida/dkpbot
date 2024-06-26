@@ -1,5 +1,3 @@
-// embeds.js
-
 const { EmbedBuilder } = require('discord.js');
 
 const COLORS = {
@@ -9,11 +7,19 @@ const COLORS = {
 };
 
 function createEmbed({ color, title, description }) {
-    return new EmbedBuilder()
+    const embed = new EmbedBuilder()
         .setColor(COLORS[color] || COLORS.info)
-        .setTitle(title)
-        .setDescription(description)
         .setTimestamp();
+
+    if (title) {
+        embed.setTitle(title);
+    }
+
+    if (description) {
+        embed.setDescription(description);
+    }
+
+    return embed;
 }
 
 function createMultipleResultsEmbed(color, title, descriptions) {
@@ -70,7 +76,7 @@ function createDkpParameterDefinedEmbed(name, points, action) {
         description = `Action not recognized.`;
     }
 
-    return createEmbed({ color: action === 'added' || action === 'edited' ? 'success' : 'danger', title: 'DKP Parameter Update', description });
+    return createEmbed({ color: action === 'added' || action === 'edited' ? 'success' : 'error', title: 'DKP Parameter Update', description });
 }
 
 function createCrowUpdateEmbed(amount, totalCrows) {
@@ -116,12 +122,8 @@ function createJoinEventEmbed(dkpParameter, userDkp, eventCode) {
     return createEmbed({ color: 'info', title: `Joined Event`, description });
 }
 
-
 function createErrorEmbed(title, description) {
-    if (title) {
-        return createEmbed({ color: 'error', title, description });
-    }
-    return createEmbed({ color: 'error', title: 'Error', description });
+    return createEmbed({ color: 'error', title: title || 'Error', description });
 }
 
 function createInfoEmbed(title, description) {
