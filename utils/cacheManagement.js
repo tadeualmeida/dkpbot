@@ -123,7 +123,11 @@ async function refreshDkpPointsCache(guildId) {
     await refreshCache(guildId, Dkp, 'dkpPoints', [], points => {
         const guildCache = getGuildCache(guildId);
         points.forEach(dkp => {
-            guildCache.set(dkp.userId, dkp);
+            if (dkp.userId) {
+                guildCache.set(dkp.userId, dkp);
+            } else {
+                console.error(`Error: userId is undefined for a DKP entry in guild ${guildId}.`);
+            }
         });
         return points;
     });
