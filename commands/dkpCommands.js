@@ -1,5 +1,3 @@
-// dkpCommands.js
-
 const { 
     getGuildCache, 
     getDkpPointsFromCache, 
@@ -16,6 +14,7 @@ const { Dkp, updateDkpTotal } = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
 const { fetchUserToModify, getUserDkpChanges, createBulkOperations, replyWithError } = require('../utils/generalUtils');
+const { sendUserNotification } = require('../events/messageHandler');
 
 async function handleDkpCommands(interaction) {
     const guildId = interaction.guildId;
@@ -110,6 +109,9 @@ async function modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, is
             participants.push({ userId: userID, username: userToModify.displayName, pointChange, transactionDescription });
             totalPointsModified += pointChange;
             descriptions.push(`${pointChange > 0 ? 'Added' : 'Removed'} **${Math.abs(pointChange)}** points to **${userToModify.displayName}**. Now have **${userDkp.points}** points.`);
+
+            // Envia mensagem direta ao usuário
+            await sendUserNotification(userToModify, pointChange, userDkp.points, descriptionInput);
         } catch (error) {
             console.error(`Failed to modify points for user ID ${userID} due to an error:`, error);
             descriptions.push(`Failed to modify points for user ID ${userID} due to an error.`);
