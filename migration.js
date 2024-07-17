@@ -1,5 +1,6 @@
 // migration.js
 
+require('dotenv').config();
 const mongoose = require('mongoose');
 const Dkp = require('./schema/Dkp');
 const RoleConfig = require('./schema/RoleConfig');
@@ -11,7 +12,7 @@ const GuildBank = require('./schema/GuildBank');
 const GuildConfig = require('./schema/GuildConfig');
 
 // Configuração da conexão com o MongoDB
-const mongoURI = 'mongodb+srv://insanitygamingdocs:insanitygamingdocs01@cluster0.opc8i5e.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0'; // Atualize com sua URI do MongoDB
+const mongoURI = process.env.MONGODB_URI;
 
 mongoose.connect(mongoURI, {
   useNewUrlParser: true,
