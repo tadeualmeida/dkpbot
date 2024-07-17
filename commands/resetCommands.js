@@ -1,7 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Event = require('../schema/Event');
-const GuildBank = require('../schema/GuildBank');
-const { Dkp, DkpTotal } = require('../schema/Dkp');
+const Dkp = require('../schema/Dkp');
 const { 
     refreshDkpParametersCache, clearCache, refreshDkpPointsCache, 
     refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, 
@@ -10,6 +9,7 @@ const {
 const { createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const { replyWithError } = require('../utils/generalUtils');
+const GuildConfig = require('../schema/GuildConfig');
 
 async function handleResetCommand(interaction) {
     const guildId = interaction.guildId;
@@ -44,11 +44,11 @@ async function handleResetCommand(interaction) {
     collector.on('collect', async i => {
         if (i.customId === 'confirm_reset') {
             await resetGuildData(guildId);
-            const resetCompleteEmbed = createInfoEmbed('Reset Complete',`All DKP points, events, and crows have been reset for this guild`);
+            const resetCompleteEmbed = createInfoEmbed('Reset Complete', `All DKP points, events, and crows have been reset for this guild`);
             await sendMessageToConfiguredChannels(interaction, `All DKP points, events, and crows have been reset for this guild by **${userName}**.`, 'dkp');
             await i.update({ embeds: [resetCompleteEmbed], components: [], ephemeral: true });
         } else if (i.customId === 'cancel_reset') {
-            const resetCancelledEmbed = createInfoEmbed('Reset Cancelled','The reset operation has been cancelled.');
+            const resetCancelledEmbed = createInfoEmbed('Reset Cancelled', 'The reset operation has been cancelled.');
             await i.update({ embeds: [resetCancelledEmbed], components: [], ephemeral: true });
         }
     });
@@ -65,8 +65,7 @@ async function resetGuildData(guildId) {
     const resetOperations = [
         Dkp.deleteMany({ guildId }).exec(),
         Event.deleteMany({ guildId }).exec(),
-        GuildBank.updateOne({ guildId }, { crows: 0 }, { upsert: true }).exec(),
-        DkpTotal.updateOne({ guildId }, { totalDkp: 0 }, { upsert: true }).exec()
+        GuildConfig.updateOne({ guildId }, { $set: { crows: 0, totalDkp: 0 } }, { upsert: true }).exec()
     ];
 
     await Promise.all(resetOperations);

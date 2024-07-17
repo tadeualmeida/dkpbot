@@ -7,6 +7,12 @@ async function checkRolePermission(interaction, commandName) {
     }
 
     const roleConfigs = await getRoleConfigFromCache(interaction.guildId);
+    if (!roleConfigs || !Array.isArray(roleConfigs)) {
+        console.error('Error: roleConfigs is not an array or is undefined/null');
+        await interaction.reply({ content: "There was an error checking your permissions. Please contact an administrator.", ephemeral: true });
+        return false;
+    }
+
     const memberRoles = interaction.member.roles.cache;
 
     const commandGroups = {

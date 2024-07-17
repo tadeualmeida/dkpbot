@@ -1,22 +1,17 @@
 // guildManagement.js
 
 const { scheduleJob, cancelScheduledJob } = require('./scheduler');
-const { Dkp, DkpTotal } = require('../schema/Dkp');
+const Dkp = require('../schema/Dkp');
+const GuildConfig = require('../schema/GuildConfig');
 const Event = require('../schema/Event');
 const { clearCache } = require('./cacheManagement');
-const DkpParameter = require('../schema/DkParameter');
-const ChannelConfig = require('../schema/ChannelConfig');
-const GuildBank = require('../schema/GuildBank');
-const RoleConfig = require('../schema/RoleConfig');
-const DkpMinimum = require('../schema/DkpMinimum');
-const EventTimer = require('../schema/EventTimer');
 
 const scheduledDeletions = new Map();
 
 async function checkForOrphanedGuilds(client) {
     try {
         const allGuildIds = new Set(client.guilds.cache.keys());
-        const storedGuilds = await Dkp.distinct('guildId');
+        const storedGuilds = await GuildConfig.distinct('guildId');
 
         const orphanedGuilds = storedGuilds.filter(guildId => !allGuildIds.has(guildId));
         
@@ -32,20 +27,14 @@ async function checkForOrphanedGuilds(client) {
 async function scheduleGuildDeletion(guildId) {
     console.log(`Scheduling deletion for guild ${guildId}`);
 
-    await scheduleJob(guildId, guildId, 1440, async () => {  // 1440 minutes = 24 hours
+    const job = await scheduleJob(guildId, guildId, 1440, async () => {  // 1440 minutes = 24 hours
         try {
             console.log(`Deleting data for guild ${guildId}.`);
 
             const deletePromises = [
                 Dkp.deleteMany({ guildId }),
-                DkpTotal.deleteMany({ guildId }),
                 Event.deleteMany({ guildId }),
-                DkpParameter.deleteMany({ guildId }),
-                ChannelConfig.deleteMany({ guildId }),
-                GuildBank.deleteMany({ guildId }),
-                RoleConfig.deleteMany({ guildId }),
-                DkpMinimum.deleteMany({ guildId }),
-                EventTimer.deleteMany({ guildId })
+                GuildConfig.deleteMany({ guildId })
             ];
 
             await Promise.all(deletePromises);

@@ -10,10 +10,10 @@ const {
     getDkpRankingFromCache 
 } = require('../utils/cacheManagement');
 const { createMultipleResultsEmbed, createInfoEmbed } = require('../utils/embeds');
-const { Dkp, updateDkpTotal } = require('../schema/Dkp');
+const Dkp = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const validator = require('validator');
-const { fetchUserToModify, getUserDkpChanges, createBulkOperations, replyWithError } = require('../utils/generalUtils');
+const { fetchUserToModify, getUserDkpChanges, createBulkOperations, replyWithError, updateDkpTotal } = require('../utils/generalUtils');
 const { sendUserNotification } = require('../events/messageHandler');
 
 async function handleDkpCommands(interaction) {

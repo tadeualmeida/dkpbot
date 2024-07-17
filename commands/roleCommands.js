@@ -1,14 +1,16 @@
 // roleCommands.js
-const RoleConfig = require('../schema/RoleConfig');
+
+const GuildConfig = require('../schema/GuildConfig');
 
 async function handleSetRoleCommand(interaction) {
     const commandGroup = interaction.options.getString('commandgroup');
     const role = interaction.options.getRole('role');
 
     try {
-        const result = await RoleConfig.updateOne(
-            { commandGroup: commandGroup, guildId: interaction.guildId },
-            { $set: { roleId: role.id } },
+        // Atualiza o roleId no schema GuildConfig
+        const result = await GuildConfig.updateOne(
+            { guildId: interaction.guildId },
+            { $set: { [`roles.${commandGroup}`]: role.id } },
             { upsert: true }
         );
 
@@ -20,3 +22,4 @@ async function handleSetRoleCommand(interaction) {
 }
 
 module.exports = { handleSetRoleCommand };
+

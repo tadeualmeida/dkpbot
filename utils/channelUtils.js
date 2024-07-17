@@ -1,11 +1,11 @@
 // channelUtils.js
 
-const ChannelConfig = require('../schema/ChannelConfig');
+const GuildConfig = require('../schema/GuildConfig');
 const { createInfoEmbed } = require('./embeds');
 
 async function sendMessageToConfiguredChannels(interaction, description, messageType) {
-    const channelConfig = await ChannelConfig.findOne({ guildId: interaction.guildId });
-    if (channelConfig && channelConfig.channels.length > 0) {
+    const guildConfig = await GuildConfig.findOne({ guildId: interaction.guildId });
+    if (guildConfig && guildConfig.channels.length > 0) {
         let embedTitle;
         switch (messageType) {
             case 'dkp':
@@ -21,7 +21,7 @@ async function sendMessageToConfiguredChannels(interaction, description, message
                 embedTitle = 'Info';
         }
 
-        for (const channelId of channelConfig.channels) {
+        for (const channelId of guildConfig.channels) {
             const channel = interaction.client.channels.cache.get(channelId);
             if (channel) {
                 await channel.send({ embeds: [createInfoEmbed(embedTitle, description)] });

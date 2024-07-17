@@ -24,10 +24,10 @@ const {
     getGuildConfigFromCache
 } = require('../utils/cacheManagement');
 const { generateRandomCode } = require('../utils/codeGenerator');
-const { Dkp, updateDkpTotal } = require('../schema/Dkp');
+const Dkp = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const { scheduleEventEnd, cancelScheduledJob } = require('../utils/scheduler');
-const { createBulkOperations, replyWithError } = require('../utils/generalUtils');
+const { createBulkOperations, replyWithError, updateDkpTotal } = require('../utils/generalUtils');
 
 async function handleEventCommands(interaction) {
     try {

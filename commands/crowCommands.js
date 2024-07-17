@@ -1,7 +1,7 @@
 const { createCrowUpdateEmbed, createCrowBalanceEmbed, createErrorEmbed } = require('../utils/embeds');
 const { modifyCrows } = require('../utils/crowManager');
 const { isPositiveInteger, fetchGuildMember, replyWithError } = require('../utils/generalUtils');
-const { getDkpMinimumFromCache, getCrowsFromCache, refreshCrowCache, getEligibleUsersFromCache } = require('../utils/cacheManagement');
+const { getGuildConfigFromCache, getDkpMinimumFromCache, getCrowsFromCache, refreshCrowCache, getEligibleUsersFromCache } = require('../utils/cacheManagement');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 
 async function handleCrowCommands(interaction) {

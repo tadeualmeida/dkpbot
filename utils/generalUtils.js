@@ -1,5 +1,8 @@
+// generalUtils.js
+
 const validator = require('validator');
 const { createErrorEmbed } = require('./embeds');
+const GuildConfig = require('../schema/GuildConfig'); // Certifique-se de importar o GuildConfig
 
 function isPositiveInteger(value) {
     return validator.isInt(value.toString(), { min: 1 });
@@ -59,4 +62,22 @@ async function replyWithError(interaction, title, message) {
     }
 }
 
-module.exports = { isPositiveInteger, createBulkOperations, fetchGuildMember, fetchUserToModify, getUserDkpChanges, replyWithError };
+// Função para atualizar o total de DKP
+async function updateDkpTotal(pointsToModify, guildId) {
+    const result = await GuildConfig.findOneAndUpdate(
+        { guildId: guildId },
+        { $inc: { totalDkp: pointsToModify } },
+        { new: true, upsert: true }
+    );
+    return result.totalDkp;
+}
+
+module.exports = { 
+    isPositiveInteger, 
+    createBulkOperations, 
+    fetchGuildMember, 
+    fetchUserToModify, 
+    getUserDkpChanges, 
+    replyWithError, 
+    updateDkpTotal 
+};

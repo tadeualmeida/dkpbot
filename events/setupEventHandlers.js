@@ -21,6 +21,7 @@ const {
     scheduleGuildDeletion, 
     cancelScheduledGuildDeletion 
 } = require('../utils/guildManagement');
+const GuildConfig = require('../schema/GuildConfig');
 
 async function refreshAllCaches(guildId) {
     console.log(`Refreshing all caches for guild: ${guildId}`);
@@ -38,6 +39,25 @@ async function refreshAllCaches(guildId) {
     console.log(`All caches refreshed for guild: ${guildId}`);
 }
 
+async function ensureGuildConfigExists(guildId) {
+    const existingConfig = await GuildConfig.findOne({ guildId });
+    if (!existingConfig) {
+        const newGuildConfig = new GuildConfig({
+            guildId,
+            guildName: 'Default',
+            eventTimer: 10,
+            minimumPoints: 0,
+            dkpParameters: [],
+            roles: [],
+            channels: [],
+            totalDkp: 0,
+            crows: 0
+        });
+        await newGuildConfig.save();
+        console.log(`Created new GuildConfig for guild: ${guildId}`);
+    }
+}
+
 function setupEventHandlers(client) {
     client.on('ready', async () => {
         console.log(`Logged in as ${client.user.tag}!`);
@@ -46,6 +66,7 @@ function setupEventHandlers(client) {
         for (const guild of client.guilds.cache.values()) {
             clearCache(guild.id);
             try {
+                await ensureGuildConfigExists(guild.id);
                 await refreshAllCaches(guild.id);
                 await registerCommands(guild.id);
                 console.log(`Todos os caches foram atualizados corretamente para a guilda ${guild.id}`);
@@ -63,6 +84,7 @@ function setupEventHandlers(client) {
         clearCache(guild.id);
 
         try {
+            await ensureGuildConfigExists(guild.id);
             await refreshAllCaches(guild.id);
             await registerCommands(guild.id);
             console.log(`Todos os caches foram atualizados corretamente para a nova guilda ${guild.id}`);

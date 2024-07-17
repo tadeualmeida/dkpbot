@@ -1,3 +1,5 @@
+// Dkp.js
+
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
@@ -16,21 +18,4 @@ const dkpSchema = new Schema({
 
 const Dkp = mongoose.model('Dkp', dkpSchema);
 
-const DkpTotalSchema = new Schema({
-  guildId: { type: String, required: true, index: true }, // Adicionado guildId
-  totalDkp: { type: Number, default: 0 }
-}, { timestamps: true });
-
-const DkpTotal = mongoose.model('DkpTotal', DkpTotalSchema);
-
-// Função para atualizar o total de DKP
-async function updateDkpTotal(pointsToModify, guildId) {
-  const result = await DkpTotal.findOneAndUpdate(
-    { guildId: guildId },
-    { $inc: { totalDkp: pointsToModify } },
-    { new: true, upsert: true }
-  );
-  return result.totalDkp;
-}
-
-module.exports = { Dkp, DkpTotal, updateDkpTotal };
+module.exports = Dkp;

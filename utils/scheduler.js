@@ -10,10 +10,10 @@ const {
     refreshDkpRankingCache,
     removeActiveEventFromCache
 } = require('./cacheManagement');
-const Event = require('../schema/Event');
 const { sendMessageToConfiguredChannels } = require('./channelUtils');
-const { Dkp, updateDkpTotal } = require('../schema/Dkp');
-const { createBulkOperations } = require('./generalUtils');
+const { createBulkOperations, updateDkpTotal } = require('./generalUtils');
+const Dkp = require('../schema/Dkp');
+const Event = require('../schema/Event');
 
 const scheduledJobs = new Map();
 
@@ -55,6 +55,12 @@ async function scheduleEventEnd(eventCode, parameterName, guildId, interaction, 
         }
 
         const participants = getEventParticipantsFromCache(guildId, eventCode);
+        
+        if (participants.some(participant => !participant.userId)) {
+            console.error(`Error: One or more participants in event ${eventCode} for guild ${guildId} have an undefined userId.`);
+            return;
+        }
+
         eventToEnd.participants = participants;
         eventToEnd.isActive = false;
         await eventToEnd.save();

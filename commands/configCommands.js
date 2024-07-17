@@ -1,3 +1,5 @@
+// configCommands.js
+
 const { 
     getGuildCache, 
     refreshDkpParametersCache, 
@@ -10,11 +12,6 @@ const {
 } = require('../utils/cacheManagement');
 const { createDkpParameterDefinedEmbed, createMultipleResultsEmbed, createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
 const { replyWithError } = require('../utils/generalUtils');
-const DkpParameter = require('../schema/DkParameter');
-const ChannelConfig = require('../schema/ChannelConfig');
-const DkpMinimum = require('../schema/DkpMinimum');
-const RoleConfig = require('../schema/RoleConfig');
-const EventTimer = require('../schema/EventTimer');
 const validator = require('validator');
 const GuildConfig = require('../schema/GuildConfig');
 
@@ -53,22 +50,32 @@ async function handleConfigDkp(interaction, guildId) {
         return;
     }
 
+    const guildConfig = await GuildConfig.findOne({ guildId });
+
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
+    }
+
     if (action === 'add' || action === 'edit') {
         const points = interaction.options.getInteger('points');
         if (points == null) {
             await replyWithError(interaction, null, "You must specify a valid points value.");
             return;
         }
-        const updatedParameter = await DkpParameter.findOneAndUpdate(
-            { name, guildId },
-            { $set: { points } },
-            { new: true, upsert: true }
-        );
+        const existingParameterIndex = guildConfig.dkpParameters.findIndex(param => param.name === name);
+        if (existingParameterIndex !== -1) {
+            guildConfig.dkpParameters[existingParameterIndex].points = points;
+        } else {
+            guildConfig.dkpParameters.push({ name, points });
+        }
+        await guildConfig.save();
         await refreshDkpParametersCache(guildId);
         const actionText = action === 'add' ? 'added' : 'edited';
-        await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, updatedParameter.points, actionText)], ephemeral: true });
+        await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, points, actionText)], ephemeral: true });
     } else if (action === 'remove') {
-        await DkpParameter.findOneAndDelete({ guildId, name });
+        guildConfig.dkpParameters = guildConfig.dkpParameters.filter(param => param.name !== name);
+        await guildConfig.save();
         await refreshDkpParametersCache(guildId);
         await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, null, 'removed')], ephemeral: true });
     } else if (action === 'minimum') {
@@ -77,11 +84,8 @@ async function handleConfigDkp(interaction, guildId) {
             await replyWithError(interaction, null, "You must specify a valid minimum points value.");
             return;
         }
-        await DkpMinimum.findOneAndUpdate(
-            { guildId },
-            { $set: { minimumPoints } },
-            { new: true, upsert: true }
-        );
+        guildConfig.minimumPoints = minimumPoints;
+        await guildConfig.save();
         await refreshDkpMinimumCache(guildId);
         await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP Points Set', `Minimum DKP points set to ${minimumPoints} successfully.`)], ephemeral: true });
     }
@@ -90,57 +94,59 @@ async function handleConfigDkp(interaction, guildId) {
 async function handleConfigChannel(interaction, guildId) {
     const action = interaction.options.getString('action');
     const channel = interaction.options.getChannel('channel');
-    const existingConfig = await ChannelConfig.findOne({ guildId });
+    const guildConfig = await GuildConfig.findOne({ guildId });
+
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
+    }
 
     if (action === 'add') {
-        if (existingConfig) {
-            if (existingConfig.channels.includes(channel.id)) {
-                await replyWithError(interaction, null, 'This channel is already added.');
-                return;
-            }
-            existingConfig.channels.push(channel.id);
-            await existingConfig.save();
-        } else {
-            const newConfig = new ChannelConfig({ guildId, channels: [channel.id] });
-            await newConfig.save();
+        if (guildConfig.channels.includes(channel.id)) {
+            await replyWithError(interaction, null, 'This channel is already added.');
+            return;
         }
+        guildConfig.channels.push(channel.id);
+        await guildConfig.save();
+        await refreshGuildConfigCache(guildId);
         await interaction.reply({ embeds: [createInfoEmbed('Channel Added', `Channel <#${channel.id}> added successfully.`)], ephemeral: true });
     } else if (action === 'remove') {
-        if (!existingConfig || !existingConfig.channels.includes(channel.id)) {
+        if (!guildConfig.channels.includes(channel.id)) {
             await replyWithError(interaction, null, 'This channel is not configured.');
             return;
         }
-        existingConfig.channels = existingConfig.channels.filter(id => id !== channel.id);
-        await existingConfig.save();
+        guildConfig.channels = guildConfig.channels.filter(id => id !== channel.id);
+        await guildConfig.save();
+        await refreshGuildConfigCache(guildId);
         await interaction.reply({ embeds: [createInfoEmbed('Channel Removed', `Channel <#${channel.id}> removed successfully.`)], ephemeral: true });
-    } 
+    }
 }
 
 async function handleConfigShow(interaction, guildId) {
     const action = interaction.options.getString('action');
+    const guildConfig = await GuildConfig.findOne({ guildId });
+
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
+    }
 
     if (action === 'parameters') {
-        const guildCache = getGuildCache(guildId);
-        const allParameters = guildCache.keys()
-            .filter(key => key.startsWith('dkpParameter:'))
-            .map(key => guildCache.get(key))
-            .filter(param => param && param.guildId === guildId);
-        const descriptions = allParameters.map(param => `${param.name}: **${param.points}** points`);
+        const descriptions = guildConfig.dkpParameters.map(param => `${param.name}: **${param.points}** points`);
         await interaction.reply({ embeds: [createMultipleResultsEmbed('info', 'DKP Parameters List', descriptions)], ephemeral: true });
     } else if (action === 'channels') {
-        const channels = await getChannelsFromCache(guildId);
-        if (channels.length > 0) {
-            const channelList = channels.map(id => `<#${id}>`).join('\n');
+        const channelList = guildConfig.channels.map(id => `<#${id}>`).join('\n');
+        if (channelList) {
             await interaction.reply({ embeds: [createInfoEmbed('Configured Channels', channelList)], ephemeral: true });
         } else {
             await interaction.reply({ content: 'No channels configured.', ephemeral: true });
         }
     } else if (action === 'minimum') {
-        const minimumDkp = await getDkpMinimumFromCache(guildId);
-        const description = minimumDkp !== null ? `Minimum DKP: **${minimumDkp}** points.` : 'No minimum DKP set.';
+        const minimumDkp = guildConfig.minimumPoints || 'Not set';
+        const description = `Minimum DKP: **${minimumDkp}** points.`;
         await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP', description)], ephemeral: true });
     } else if (action === 'event') {
-        const eventTimer = await getEventTimerFromCache(guildId);
+        const eventTimer = guildConfig.eventTimer || 'Not set';
         const description = `Event Timeout: **${eventTimer}** minutes.`;
         await interaction.reply({ embeds: [createInfoEmbed('Event Timeout', description)], ephemeral: true });
     }
@@ -148,21 +154,22 @@ async function handleConfigShow(interaction, guildId) {
 
 async function handleConfigEvent(interaction, guildId) {
     const action = interaction.options.getString('action');
+    const guildConfig = await GuildConfig.findOne({ guildId });
+
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
+    }
+
     if (action === 'timer') {
         const minutes = interaction.options.getInteger('minutes');
         if (minutes == null || minutes <= 0) {
             await replyWithError(interaction, null, "You must specify a valid timeout duration in minutes.");
             return;
         }
-
-        await EventTimer.findOneAndUpdate(
-            { guildId },
-            { $set: { EventTimer: minutes } },
-            { new: true, upsert: true }
-        );
-
+        guildConfig.eventTimer = minutes;
+        await guildConfig.save();
         await refreshEventTimerCache(guildId);
-
         await interaction.reply({ embeds: [createInfoEmbed('Event Timeout Set', `Event timeout set to ${minutes} minutes successfully.`)], ephemeral: true });
     }
 }
@@ -170,40 +177,40 @@ async function handleConfigEvent(interaction, guildId) {
 async function handleSetRoleCommand(interaction, guildId) {
     const commandGroup = interaction.options.getString('commandgroup');
     const role = interaction.options.getRole('role');
+    const guildConfig = await GuildConfig.findOne({ guildId });
 
-    try {
-        await RoleConfig.updateOne(
-            { commandGroup, guildId },
-            { $set: { roleId: role.id } },
-            { upsert: true }
-        );
-
-        await refreshRoleConfigCache(guildId);
-
-        await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
-    } catch (error) {
-        console.error('Error setting role:', error);
-        await replyWithError(interaction, 'Failed to set role due to an error.', null);
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
     }
+
+    const existingRoleConfig = guildConfig.roles.find(r => r.commandGroup === commandGroup);
+
+    if (existingRoleConfig) {
+        existingRoleConfig.roleId = role.id;
+    } else {
+        guildConfig.roles.push({ commandGroup, roleId: role.id });
+    }
+
+    await guildConfig.save();
+    await refreshGuildConfigCache(guildId);
+    await refreshRoleConfigCache(guildId);
+    await interaction.reply({ embeds: [createInfoEmbed('Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`)], ephemeral: true });
 }
 
 async function handleSetGuildName(interaction, guildId) {
     const guildName = interaction.options.getString('name');
+    const guildConfig = await GuildConfig.findOne({ guildId });
 
-    try {
-        await GuildConfig.updateOne(
-            { guildId },
-            { $set: { guildName } },
-            { upsert: true }
-        );
-
-        await refreshGuildConfigCache(guildId);
-
-        await interaction.reply({ embeds: [createInfoEmbed('Guild Name Set', `The guild name has been set to **${guildName}**.`)], ephemeral: true });
-    } catch (error) {
-        console.error('Error setting guild name:', error);
-        await replyWithError(interaction, 'Failed to set guild name due to an error.', null);
+    if (!guildConfig) {
+        await replyWithError(interaction, null, "Guild configuration not found.");
+        return;
     }
+
+    guildConfig.guildName = guildName;
+    await guildConfig.save();
+    await refreshGuildConfigCache(guildId);
+    await interaction.reply({ embeds: [createInfoEmbed('Guild Name Set', `The guild name has been set to **${guildName}**.`)], ephemeral: true });
 }
 
 module.exports = { handleConfigCommands };
