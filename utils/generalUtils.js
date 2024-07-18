@@ -52,15 +52,14 @@ async function getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, ge
     return { pointChange, userDkp };
 }
 
-async function replyWithError(interaction, title, message) {
-    const errorEmbed = createErrorEmbed(title, message);
-
-    if (interaction.replied || interaction.deferred) {
-        await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+async function replyWithError(interaction, title, description) {
+    if (interaction.deferred || interaction.replied) {
+        await interaction.followUp({ embeds: [createErrorEmbed(title, description)], ephemeral: true });
     } else {
-        await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+        await interaction.reply({ embeds: [createErrorEmbed(title, description)], ephemeral: true });
     }
 }
+
 
 // Função para atualizar o total de DKP
 async function updateDkpTotal(pointsToModify, guildId) {

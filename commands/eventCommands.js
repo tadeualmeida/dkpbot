@@ -31,6 +31,8 @@ const { createBulkOperations, replyWithError, updateDkpTotal } = require('../uti
 
 async function handleEventCommands(interaction) {
     try {
+        await interaction.deferReply({ ephemeral: true });
+
         if (interaction.commandName === 'event') {
             const subcommand = interaction.options.getSubcommand(false);
             if (!subcommand) {
@@ -53,21 +55,19 @@ async function handleEventCommands(interaction) {
 }
 
 async function startEvent(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
     const parameterName = validator.escape(interaction.options.getString('parameter'));
     const guildId = interaction.guildId;
-    const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
-    const eventTimer = await getEventTimerFromCache(guildId);
+    const [dkpParameter, eventTimer, activeEvents, guildConfig] = await Promise.all([
+        getDkpParameterFromCache(guildId, parameterName),
+        getEventTimerFromCache(guildId),
+        getActiveEventsFromCache(guildId),
+        getGuildConfigFromCache(guildId)
+    ]);
 
-    if (!dkpParameter) {
-        await replyWithError(interaction, null, `No DKP parameter found with name '${parameterName}'. Please define it first using '/config dkp'.`);
-        return;
-    }
+    if (!dkpParameter) return replyWithError(interaction, null, `No DKP parameter found with name '${parameterName}'.`);
 
-    if (getActiveEventsFromCache(guildId).some(event => event.parameterName === parameterName && event.isActive)) {
-        await replyWithError(interaction, null, `An event with the parameter '${parameterName}' is already active. Please end it before starting a new one with the same parameter.`);
-        return;
+    if (activeEvents.some(event => event.parameterName === parameterName && event.isActive)) {
+        return replyWithError(interaction, null, `An event with the parameter '${parameterName}' is already active.`);
     }
 
     const eventCode = generateRandomCode();
@@ -83,9 +83,7 @@ async function startEvent(interaction) {
     addParticipantToEventCache(guildId, eventCode, { userId, username: userDisplayName, discordUsername: interaction.user.username, joinedAt: new Date() });
     await scheduleEventEnd(eventCode, parameterName, guildId, interaction, eventTimer);
 
-    const guildConfig = await getGuildConfigFromCache(guildId);
     const combinedEventEmbed = createCombinedEventEmbed(parameterName, eventCode, dkpParameter, { points: totalPoints }, guildConfig);
-
     const guildName = guildConfig?.guildName ? guildConfig.guildName.toUpperCase() : 'Event';
     const message = `User **${userDisplayName}** has started an event with parameter **${parameterName}**.\n\n${guildName} CODE: **${eventCode}**`;
 
@@ -94,16 +92,11 @@ async function startEvent(interaction) {
 }
 
 async function endEvent(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
     const eventCodeToEnd = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
 
     const eventToEnd = getActiveEventsFromCache(guildId).find(event => event.code === eventCodeToEnd && event.isActive);
-    if (!eventToEnd) {
-        await replyWithError(interaction, null, "Event not found or already ended.");
-        return;
-    }
+    if (!eventToEnd) return replyWithError(interaction, null, "Event not found or already ended.");
 
     const participants = getEventParticipantsFromCache(guildId, eventCodeToEnd);
     eventToEnd.participants = participants;
@@ -111,13 +104,9 @@ async function endEvent(interaction) {
     await Event.updateOne({ guildId, code: eventCodeToEnd }, { $set: { isActive: false, participants } });
 
     const dkpParameter = await getDkpParameterFromCache(guildId, eventToEnd.parameterName);
-    if (!dkpParameter || typeof dkpParameter.points !== 'number') {
-        await replyWithError(interaction, null, "Invalid DKP parameter points.");
-        return;
-    }
+    if (!dkpParameter || typeof dkpParameter.points !== 'number') return replyWithError(interaction, null, "Invalid DKP parameter points.");
 
     const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCodeToEnd} ended`);
-
     if (bulkOperations.length > 0) {
         await Dkp.bulkWrite(bulkOperations);
         await updateDkpTotal(bulkOperations.length * dkpParameter.points, guildId);
@@ -137,16 +126,11 @@ async function endEvent(interaction) {
 }
 
 async function cancelEvent(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
     const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
     const guildId = interaction.guildId;
 
     const eventToCancel = getActiveEventsFromCache(guildId).find(event => event.code === eventCode && event.isActive);
-    if (!eventToCancel) {
-        await replyWithError(interaction, null, 'No active event found with the provided code.');
-        return;
-    }
+    if (!eventToCancel) return replyWithError(interaction, null, 'No active event found with the provided code.');
 
     eventToCancel.isActive = false;
     await Event.updateOne({ guildId, code: eventCode }, { $set: { isActive: false } });
@@ -166,27 +150,15 @@ async function cancelEvent(interaction) {
 }
 
 async function joinEvent(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
     const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
     const guildId = interaction.guildId;
 
     const event = getActiveEventsFromCache(guildId).find(event => event.code === eventCode && event.isActive);
-    if (!event) {
-        await replyWithError(interaction, null, 'No active event found with the provided code.');
-        return;
-    }
+    if (!event) return replyWithError(interaction, null, 'No active event found with the provided code.');
 
     const participants = getEventParticipantsFromCache(guildId, eventCode);
-
     if (participants.some(p => p.userId === interaction.user.id)) {
-        await replyWithError(interaction, null, 'You have already joined this event.');
-        return;
-    }
-
-    if (participants[0]?.userId === interaction.user.id) {
-        await replyWithError(interaction, null, 'You have already joined the event you created.');
-        return;
+        return replyWithError(interaction, null, 'You have already joined this event.');
     }
 
     const userId = interaction.user.id;
@@ -202,14 +174,10 @@ async function joinEvent(interaction) {
         joinedAt: new Date()
     });
 
-    const joinEventEmbed = createJoinEventEmbed(dkpParameter, { points: totalPoints }, eventCode);
-
-    await interaction.editReply({ embeds: [joinEventEmbed], ephemeral: true });
+    await interaction.editReply({ embeds: [createJoinEventEmbed(dkpParameter, { points: totalPoints }, eventCode)], ephemeral: true });
 }
 
 async function listEvent(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-
     const eventCode = validator.escape(interaction.options.getString('code'));
     const guildId = interaction.guildId;
 
@@ -220,9 +188,7 @@ async function listEvent(interaction) {
     }
 
     const participants = getEventParticipantsFromCache(guildId, eventCode).length > 0 ? getEventParticipantsFromCache(guildId, eventCode) : event.participants;
-    const descriptions = participants.map(p => `${p.username}`);
-
-    await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, descriptions)], ephemeral: true });
+    await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, participants.map(p => p.username))], ephemeral: true });
 }
 
 module.exports = { handleEventCommands };
