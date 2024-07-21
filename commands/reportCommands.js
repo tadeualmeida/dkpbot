@@ -1,5 +1,5 @@
 const ExcelJS = require('exceljs');
-const { Dkp } = require('../schema/Dkp');
+const Dkp = require('../schema/Dkp');
 const { AttachmentBuilder } = require('discord.js');
 
 async function generateRankReport(guild) {
