@@ -22,7 +22,7 @@ async function handleAutocomplete(interaction) {
     const focusedName = interaction.options.getFocused(true).name;
 
     if (interaction.commandName === 'event') {
-        if (subcommand === 'start' && focusedName === 'parameter') {
+        if ((subcommand === 'start' || subcommand === 'rank') && focusedName === 'parameter') {
             await handleParameterAutocomplete(interaction, guildId, search);
         } else if ((subcommand === 'end' || subcommand === 'cancel') && focusedName === 'code') {
             await handleEventCodeAutocomplete(interaction, guildId, search);

@@ -43,13 +43,12 @@ async function getFromCache(guildId, cacheKey, model, defaultValue = null) {
 async function refreshDkpParametersCache(guildId) {
     const guildCache = getGuildCache(guildId);
     const guildConfig = await GuildConfig.findOne({ guildId });
-    
+
     if (guildConfig && guildConfig.dkpParameters) {
         guildConfig.dkpParameters.forEach(param => {
             guildCache.set(`dkpParameter:${param.name}`, param);
         });
-        
-        // Remover qualquer parâmetro DKP que não está mais presente na configuração da guilda
+
         const keys = guildCache.keys().filter(key => key.startsWith('dkpParameter:'));
         keys.forEach(key => {
             if (!guildConfig.dkpParameters.some(param => `dkpParameter:${param.name}` === key)) {
@@ -57,7 +56,6 @@ async function refreshDkpParametersCache(guildId) {
             }
         });
     } else {
-        // Limpar todos os parâmetros DKP do cache se não houver parâmetros configurados
         const keys = guildCache.keys().filter(key => key.startsWith('dkpParameter:'));
         keys.forEach(key => guildCache.del(key));
     }
@@ -67,24 +65,17 @@ async function getDkpParameterFromCache(guildId, paramName) {
     const guildCache = getGuildCache(guildId);
     let parameter = guildCache.get(`dkpParameter:${paramName}`);
     if (!parameter) {
-        try {
-            const guildConfig = await GuildConfig.findOne({ guildId });
-            parameter = guildConfig ? guildConfig.dkpParameters.find(param => param.name === paramName) : null;
-            if (parameter) {
-                guildCache.set(`dkpParameter:${paramName}`, parameter);
-            }
-        } catch (error) {
-            console.error(`Error getting DKP parameter ${paramName} from cache for guild ${guildId}:`, error);
-            return null;
+        const guildConfig = await GuildConfig.findOne({ guildId });
+        parameter = guildConfig ? guildConfig.dkpParameters.find(param => param.name === paramName) : null;
+        if (parameter) {
+            guildCache.set(`dkpParameter:${paramName}`, parameter);
         }
     }
     return parameter;
 }
 
 async function refreshDkpMinimumCache(guildId) {
-    await refreshCache(guildId, GuildConfig, 'minimumPoints', 0, configs => {
-        return configs.length ? configs[0].minimumPoints : 0;
-    });
+    await refreshCache(guildId, GuildConfig, 'minimumPoints', 0, configs => configs[0]?.minimumPoints || 0);
 }
 
 async function getDkpMinimumFromCache(guildId) {
@@ -92,9 +83,7 @@ async function getDkpMinimumFromCache(guildId) {
 }
 
 async function refreshEventTimerCache(guildId) {
-    await refreshCache(guildId, GuildConfig, 'eventTimer', 10, configs => {
-        return configs.length ? configs[0].eventTimer : 10;
-    });
+    await refreshCache(guildId, GuildConfig, 'eventTimer', 10, configs => configs[0]?.eventTimer || 10);
 }
 
 async function getEventTimerFromCache(guildId) {
@@ -103,10 +92,9 @@ async function getEventTimerFromCache(guildId) {
 
 async function refreshEligibleUsersCache(guildId) {
     const guildConfig = await GuildConfig.findOne({ guildId });
-    const minimumDkp = guildConfig ? guildConfig.minimumPoints : 0;
+    const minimumDkp = guildConfig?.minimumPoints || 0;
     const eligibleUsers = await Dkp.find({ guildId, points: { $gte: minimumDkp } });
-    const guildCache = getGuildCache(guildId);
-    guildCache.set('eligibleUsers', eligibleUsers);
+    getGuildCache(guildId).set('eligibleUsers', eligibleUsers);
 }
 
 async function getEligibleUsersFromCache(guildId) {
@@ -120,47 +108,35 @@ async function getEligibleUsersFromCache(guildId) {
 }
 
 function clearCache(guildId) {
-    const guildCache = getGuildCache(guildId);
-    guildCache.flushAll();
+    getGuildCache(guildId).flushAll();
 }
 
 async function refreshDkpPointsCache(guildId) {
-    try {
-        const points = await Dkp.find({ guildId });
-        const guildCache = getGuildCache(guildId);
-        points.forEach(dkp => {
-            if (dkp.userId) {
-                guildCache.set(dkp.userId, dkp);
-            } else {
-                console.error(`Error: userId is undefined for a DKP entry in guild ${guildId}.`);
-            }
-        });
-    } catch (error) {
-        console.error(`Error refreshing dkpPoints cache for guild ${guildId}:`, error);
-    }
+    const points = await Dkp.find({ guildId });
+    const guildCache = getGuildCache(guildId);
+    points.forEach(dkp => {
+        if (dkp.userId) {
+            guildCache.set(dkp.userId, dkp);
+        } else {
+            console.error(`Error: userId is undefined for a DKP entry in guild ${guildId}.`);
+        }
+    });
 }
 
 async function getDkpPointsFromCache(guildId, userId) {
     const guildCache = getGuildCache(guildId);
     let dkp = guildCache.get(userId);
     if (!dkp) {
-        try {
-            dkp = await Dkp.findOne({ guildId, userId });
-            if (dkp) {
-                guildCache.set(userId, dkp);
-            }
-        } catch (error) {
-            console.error(`Error getting DKP points for user ${userId} from cache for guild ${guildId}:`, error);
-            return null;
+        dkp = await Dkp.findOne({ guildId, userId });
+        if (dkp) {
+            guildCache.set(userId, dkp);
         }
     }
     return dkp;
 }
 
 async function refreshCrowCache(guildId) {
-    await refreshCache(guildId, GuildConfig, 'crows', 0, configs => {
-        return configs.length ? configs[0].crows : 0;
-    });
+    await refreshCache(guildId, GuildConfig, 'crows', 0, configs => configs[0]?.crows || 0);
 }
 
 async function getCrowsFromCache(guildId) {
@@ -173,52 +149,39 @@ async function getChannelsFromCache(guildId) {
 
 function addParticipantToEventCache(guildId, eventCode, participant) {
     const guildCache = getGuildCache(guildId);
-    let eventParticipants = guildCache.get(`event:${eventCode}`);
-    if (!eventParticipants) {
-        eventParticipants = [];
-    }
+    const eventParticipants = guildCache.get(`event:${eventCode}`) || [];
     eventParticipants.push(participant);
     guildCache.set(`event:${eventCode}`, eventParticipants);
 }
 
 function getEventParticipantsFromCache(guildId, eventCode) {
-    const guildCache = getGuildCache(guildId);
-    return guildCache.get(`event:${eventCode}`) || [];
+    return getGuildCache(guildId).get(`event:${eventCode}`) || [];
 }
 
 function clearEventParticipantsCache(guildId, eventCode) {
-    const guildCache = getGuildCache(guildId);
-    guildCache.del(`event:${eventCode}`);
+    getGuildCache(guildId).del(`event:${eventCode}`);
 }
 
 function addActiveEventToCache(guildId, event) {
     const guildCache = getGuildCache(guildId);
-    let activeEvents = guildCache.get('activeEvents');
-    if (!activeEvents) {
-        activeEvents = [];
-    }
+    const activeEvents = guildCache.get('activeEvents') || [];
     activeEvents.push(event);
     guildCache.set('activeEvents', activeEvents);
 }
 
 function getActiveEventsFromCache(guildId) {
-    const guildCache = getGuildCache(guildId);
-    return guildCache.get('activeEvents') || [];
+    return getGuildCache(guildId).get('activeEvents') || [];
 }
 
 function removeActiveEventFromCache(guildId, eventCode) {
     const guildCache = getGuildCache(guildId);
-    let activeEvents = guildCache.get('activeEvents');
-    if (activeEvents) {
-        activeEvents = activeEvents.filter(event => event.code !== eventCode);
-        guildCache.set('activeEvents', activeEvents);
-    }
+    const activeEvents = guildCache.get('activeEvents') || [];
+    guildCache.set('activeEvents', activeEvents.filter(event => event.code !== eventCode));
 }
 
 async function refreshDkpRankingCache(guildId) {
     const dkpRanking = await Dkp.find({ guildId }).sort({ points: -1 }).limit(50).exec();
-    const guildCache = getGuildCache(guildId);
-    guildCache.set('dkpRanking', dkpRanking);
+    getGuildCache(guildId).set('dkpRanking', dkpRanking);
 }
 
 async function getDkpRankingFromCache(guildId) {
@@ -234,13 +197,8 @@ async function getDkpRankingFromCache(guildId) {
 async function refreshRoleConfigCache(guildId) {
     await refreshCache(guildId, GuildConfig, 'roleConfig', [], config => {
         const guildCache = getGuildCache(guildId);
-        if (config.length && config[0].roles) {
-            config[0].roles.forEach(role => {
-                guildCache.set(`roleConfig:${role.commandGroup}`, role);
-            });
-            return config[0].roles;
-        }
-        return [];
+        config[0]?.roles.forEach(role => guildCache.set(`roleConfig:${role.commandGroup}`, role));
+        return config[0]?.roles || [];
     });
 }
 
@@ -255,9 +213,7 @@ async function getRoleConfigFromCache(guildId) {
 }
 
 async function refreshGuildConfigCache(guildId) {
-    await refreshCache(guildId, GuildConfig, 'guildName', {}, configs => {
-        return configs.length ? configs[0] : {};
-    });
+    await refreshCache(guildId, GuildConfig, 'guildName', {}, configs => configs[0] || {});
 }
 
 async function getGuildConfigFromCache(guildId) {

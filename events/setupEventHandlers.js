@@ -44,7 +44,7 @@ async function ensureGuildConfigExists(guildId) {
     if (!existingConfig) {
         const newGuildConfig = new GuildConfig({
             guildId,
-            guildName: 'Default',
+            guildName: 'GuildName',
             eventTimer: 10,
             minimumPoints: 0,
             dkpParameters: [],

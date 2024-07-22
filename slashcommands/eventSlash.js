@@ -47,6 +47,17 @@ const eventSlashCommand = new SlashCommandBuilder()
                     .setRequired(true)
                     .setAutocomplete(true)
             )
+    )
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('rank')
+            .setDescription('Get the ranking of participants for a specific DKP parameter')
+            .addStringOption(option =>
+                option.setName('parameter')
+                    .setDescription('The DKP parameter to rank participants by')
+                    .setRequired(true)
+                    .setAutocomplete(true)
+            )
     );
 
 const joinCommand = new SlashCommandBuilder()
@@ -58,4 +69,4 @@ const joinCommand = new SlashCommandBuilder()
             .setRequired(true)
         );
 
-module.exports = { eventSlashCommand, joinCommand};
+module.exports = { eventSlashCommand, joinCommand };

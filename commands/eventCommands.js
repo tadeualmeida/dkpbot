@@ -44,6 +44,7 @@ async function handleEventCommands(interaction) {
                 case 'end': await endEvent(interaction); break;
                 case 'list': await listEvent(interaction); break;
                 case 'cancel': await cancelEvent(interaction); break;
+                case 'rank': await handleEventRank(interaction); break;  // Adicionado o caso para 'rank'
             }
         } else if (interaction.commandName === 'join') {
             await joinEvent(interaction);
@@ -190,5 +191,64 @@ async function listEvent(interaction) {
     const participants = getEventParticipantsFromCache(guildId, eventCode).length > 0 ? getEventParticipantsFromCache(guildId, eventCode) : event.participants;
     await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, participants.map(p => p.username))], ephemeral: true });
 }
+
+// Função para lidar com o comando /event rank
+async function handleEventRank(interaction) {
+    const guildId = interaction.guildId;
+    const parameterName = interaction.options.getString('parameter');
+
+    // Obter o parâmetro DKP do cache
+    const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
+    if (!dkpParameter) {
+        await interaction.editReply({ content: `No DKP parameter found with name '${parameterName}'.`, ephemeral: true });
+        return;
+    }
+
+    // Obter todos os eventos com o parâmetro especificado
+    const events = await Event.find({ guildId, parameterName });
+
+    if (events.length === 0) {
+        await interaction.editReply({ embeds: [createInfoEmbed('No Events Found', `No events found for parameter '${parameterName}'.`)], ephemeral: true });
+        return;
+    }
+
+    // Mapear todos os participantes e suas pontuações
+    const participantScores = {};
+    events.forEach(event => {
+        event.participants.forEach(participant => {
+            if (!participantScores[participant.userId]) {
+                participantScores[participant.userId] = { username: participant.username, points: 0 };
+            }
+            participantScores[participant.userId].points += dkpParameter.points;
+        });
+    });
+
+    // Ordenar participantes por pontuação
+    const sortedParticipants = Object.values(participantScores).sort((a, b) => b.points - a.points);
+
+    // Criar descrições para embed
+    const descriptions = sortedParticipants.map((participant, index) => `${index + 1}. **${participant.username}** - ${participant.points} points`);
+
+    if (descriptions.length === 0) {
+        await interaction.editReply({ embeds: [createInfoEmbed('No Participants', 'No participants found for the specified parameter.')], ephemeral: true });
+    } else {
+        const embedTitle = `DKP Ranking for '${parameterName}'`;
+        const embeds = createRankEmbeds(descriptions, embedTitle);       
+        await interaction.editReply({ embeds, ephemeral: true });
+    }
+}
+
+function createRankEmbeds(descriptions, title) {
+    const embeds = [];
+    const chunkSize = 50;
+
+    for (let i = 0; i < descriptions.length; i += chunkSize) {
+        const chunk = descriptions.slice(i, i + chunkSize);
+        embeds.push(createMultipleResultsEmbed('info', `${title} - ${i + 1} to ${i + chunk.length}`, chunk));
+    }
+
+    return embeds;
+}
+
 
 module.exports = { handleEventCommands };
