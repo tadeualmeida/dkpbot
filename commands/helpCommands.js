@@ -37,6 +37,7 @@ const commandCategories = {
             { name: '/event end <code>', description: 'Ends the event with the specified code.', permissions: 'Administrators, Moderators', examples: ['/event end AB3'] },
             { name: '/event cancel <code>', description: 'Cancels the event with the specified code and removes DKP points.', permissions: 'Administrators, Moderators', examples: ['/event cancel AB3'] },
             { name: '/join <code>', description: 'Joins the event with the specified code.', permissions: 'Members', examples: ['/join AB3'] },
+            { name: '/event rank <parameter>', description: 'Displays the DKP ranking for the specified parameter.', permissions: 'Members', examples: ['/event rank bossKill'] },  // Novo comando adicionado
         ]
     },
     Crow: {
