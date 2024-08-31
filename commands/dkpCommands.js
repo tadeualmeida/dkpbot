@@ -20,36 +20,49 @@ async function handleDkpCommands(interaction) {
     const guildId = interaction.guildId;
     const userId = interaction.user.id;
 
-    switch (interaction.commandName) {
-        case 'dkp':
-            await handleDkpBalance(interaction, guildId, userId);
-            break;
-        case 'dkpadd':
-        case 'dkpremove':
-            await handleDkpAddRemove(interaction, guildId, interaction.commandName === 'dkpadd');
-            break;
-        case 'rank':
-            await handleDkpRank(interaction, guildId);
-            break;
+    try {
+        switch (interaction.commandName) {
+            case 'dkp':
+                await handleDkpBalance(interaction, guildId, userId);
+                break;
+            case 'dkpadd':
+            case 'dkpremove':
+                await handleDkpAddRemove(interaction, guildId, interaction.commandName === 'dkpadd');
+                break;
+            case 'rank':
+                await handleDkpRank(interaction, guildId);
+                break;
+            default:
+                await replyWithError(interaction, 'Error', 'Invalid DKP command.');
+                break;
+        }
+    } catch (error) {
+        console.error('Error handling DKP command:', error);
+        await replyWithError(interaction, 'Error', 'An error occurred while processing the DKP command.');
     }
 }
 
 async function handleDkpBalance(interaction, guildId, userId) {
-    const [userDkp, minimumDkp, crows, eligibleUsers] = await Promise.all([
-        getDkpPointsFromCache(guildId, userId),
-        getDkpMinimumFromCache(guildId),
-        getCrowsFromCache(guildId),
-        getEligibleUsersFromCache(guildId)
-    ]);
+    try {
+        const [userDkp, minimumDkp, crows, eligibleUsers] = await Promise.all([
+            getDkpPointsFromCache(guildId, userId),
+            getDkpMinimumFromCache(guildId),
+            getCrowsFromCache(guildId),
+            getEligibleUsersFromCache(guildId)
+        ]);
 
-    const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
-    const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
+        const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
+        const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
 
-    const description = getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp);
-    await interaction.reply({
-        embeds: [createInfoEmbed('DKP Balance', description)],
-        ephemeral: true
-    });
+        const description = getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp);
+        await interaction.reply({
+            embeds: [createInfoEmbed('DKP Balance', description)],
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Error fetching DKP balance:', error);
+        await replyWithError(interaction, 'Error', 'Failed to retrieve DKP balance.');
+    }
 }
 
 function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
@@ -63,9 +76,7 @@ function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
 }
 
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
-    await interaction.deferReply({
-        ephemeral: true
-    });
+    await interaction.deferReply({ ephemeral: true });
 
     const pointsToModify = interaction.options.getInteger('points');
     const userIDsInput = interaction.options.getString('users');

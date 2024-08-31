@@ -1,5 +1,3 @@
-// crowCommands.js
-
 const {
     createCrowUpdateEmbed,
     createCrowBalanceEmbed,
@@ -24,35 +22,39 @@ const {
 
 async function handleCrowCommands(interaction) {
     const guildId = interaction.guildId;
-    await interaction.deferReply({
-        ephemeral: true
-    });
+    await interaction.deferReply({ ephemeral: true });
 
-    const subcommand = interaction.options.getSubcommand(false);
+    try {
+        const subcommand = interaction.options.getSubcommand(false);
 
-    if (interaction.commandName === 'crow' && (subcommand === 'add' || subcommand === 'remove')) {
-        await handleModifyCrow(interaction, guildId, subcommand === 'add');
-    } else if (interaction.commandName === 'bank') {
-        await handleBank(interaction, guildId);
-    } else {
-        await replyWithError(interaction, null, "Unknown or missing subcommand.");
+        if (interaction.commandName === 'crow' && (subcommand === 'add' || subcommand === 'remove')) {
+            await handleModifyCrow(interaction, guildId, subcommand === 'add');
+        } else if (interaction.commandName === 'bank') {
+            await handleBank(interaction, guildId);
+        } else {
+            await replyWithError(interaction, null, "Unknown or missing subcommand.");
+        }
+    } catch (error) {
+        console.error('Error handling crow command:', error);
+        await replyWithError(interaction, "An error occurred while processing the command.", null);
     }
 }
 
 async function handleModifyCrow(interaction, guildId, isAdd) {
-    const amount = interaction.options.getInteger('amount');
-
-    if (!isPositiveInteger(amount)) {
-        return replyWithError(interaction, null, "The amount must be a positive integer.");
-    }
-
-    const amountToModify = isAdd ? amount : -amount;
-    const actionText = isAdd ? 'added to' : 'removed from';
-
     try {
+        const amount = interaction.options.getInteger('amount');
+
+        if (!isPositiveInteger(amount)) {
+            return await replyWithError(interaction, null, "The amount must be a positive integer.");
+        }
+
+        const amountToModify = isAdd ? amount : -amount;
+        const actionText = isAdd ? 'added to' : 'removed from';
+
         const modifiedCrows = await modifyCrows(guildId, amountToModify);
         await refreshCrowCache(guildId);
         await sendCrowModificationMessage(interaction, amount, modifiedCrows.crows, actionText);
+
         await interaction.editReply({
             embeds: [createCrowUpdateEmbed(amountToModify, modifiedCrows.crows)]
         });
