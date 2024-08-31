@@ -1,3 +1,5 @@
+// dkpCommands.js
+
 const { 
     getGuildCache, 
     getDkpPointsFromCache, 
@@ -44,6 +46,10 @@ async function handleDkpCommands(interaction) {
 
 async function handleDkpBalance(interaction, guildId, userId) {
     try {
+        // Adicionando deferReply para garantir que o bot tenha mais tempo para processar a resposta
+        await interaction.deferReply({ ephemeral: true });
+
+        // Pegando os dados do cache
         const [userDkp, minimumDkp, crows, eligibleUsers] = await Promise.all([
             getDkpPointsFromCache(guildId, userId),
             getDkpMinimumFromCache(guildId),
@@ -51,28 +57,34 @@ async function handleDkpBalance(interaction, guildId, userId) {
             getEligibleUsersFromCache(guildId)
         ]);
 
+        // Calculando valores necessários
         const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
         const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
 
+        // Criando a descrição da resposta
         const description = getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp);
-        await interaction.reply({
+        
+        // Respondendo à interação
+        await interaction.editReply({
             embeds: [createInfoEmbed('DKP Balance', description)],
             ephemeral: true
         });
     } catch (error) {
         console.error('Error fetching DKP balance:', error);
-        await replyWithError(interaction, 'Error', 'Failed to retrieve DKP balance.');
+
+        // Certifique-se de responder a qualquer erro corretamente
+        if (interaction.replied || interaction.deferred) {
+            await interaction.editReply({
+                content: 'Failed to retrieve DKP balance due to an error.',
+                ephemeral: true
+            });
+        } else {
+            await interaction.reply({
+                content: 'Failed to retrieve DKP balance due to an error.',
+                ephemeral: true
+            });
+        }
     }
-}
-
-function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
-    const points = userDkp ? userDkp.points : 0;
-    const userCrows = (points * crowsPerDkp).toFixed(2);
-    const pointsNeeded = minimumDkp - points;
-
-    return minimumDkp === 0 || points >= minimumDkp ?
-        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nEstimated crows per DKP: **${crowsPerDkp}** crows\n\nCrows you are currently earning: **${userCrows}**` :
-        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nYou are currently earning **0** crows because your DKP is below the minimum required.\n\n**Note:** The minimum DKP to earn crows is **${minimumDkp}** DKP. You need **${pointsNeeded}** more points to start earning crows.`;
 }
 
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
