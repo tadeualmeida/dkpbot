@@ -87,6 +87,16 @@ async function handleDkpBalance(interaction, guildId, userId) {
     }
 }
 
+function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
+    const points = userDkp ? userDkp.points : 0;
+    const userCrows = (points * crowsPerDkp).toFixed(2);
+    const pointsNeeded = minimumDkp - points;
+
+    return minimumDkp === 0 || points >= minimumDkp ?
+        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nEstimated crows per DKP: **${crowsPerDkp}** crows\n\nCrows you are currently earning: **${userCrows}**` :
+        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nYou are currently earning **0** crows because your DKP is below the minimum required.\n\n**Note:** The minimum DKP to earn crows is **${minimumDkp}** DKP. You need **${pointsNeeded}** more points to start earning crows.`;
+}
+
 async function handleDkpAddRemove(interaction, guildId, isAdd) {
     await interaction.deferReply({ ephemeral: true });
 
