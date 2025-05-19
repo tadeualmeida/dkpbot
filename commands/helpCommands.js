@@ -1,4 +1,4 @@
-// commands/helpCommands.js
+//commands/helpCommands.js
 const { createInfoEmbed } = require('../utils/embeds');
 
 const commandCategories = {

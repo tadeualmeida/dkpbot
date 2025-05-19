@@ -1,4 +1,4 @@
-// commands/roleCommands.js
+//commands/roleCommands.js
 const { loadGuildConfig, invalidateGuildConfig } = require('../utils/config');
 const {
   refreshRoleConfigCache,

@@ -1,4 +1,4 @@
-// slashcommands/currencySlash.js
+//slashcommands/currencySlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const currencyCommand = new SlashCommandBuilder()

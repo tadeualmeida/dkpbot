@@ -1,4 +1,4 @@
-// commands/dkpCommands.js
+//commands/dkpCommands.js
 
 const {
   getDkpPointsFromCache,
