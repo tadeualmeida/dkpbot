@@ -1,4 +1,4 @@
-// utils/reminderScheduler.js
+//utils/reminderScheduler.js
 
 const schedule   = require('node-schedule');
 const Reminder   = require('../schema/Reminder');

@@ -1,4 +1,4 @@
-// events/messageHandler.js
+//events/messageHandler.js
 
 const { getActiveEventsFromCache } = require('../utils/cacheManagement');
 const { createInfoEmbed } = require('../utils/embeds');

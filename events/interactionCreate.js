@@ -1,4 +1,4 @@
-// events/interactionCreate.js
+//events/interactionCreate.js
 
 const {
   getGuildCache,

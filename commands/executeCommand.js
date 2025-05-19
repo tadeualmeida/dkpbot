@@ -1,4 +1,4 @@
-// commands/executeCommands.js
+//commands/executeCommands.js
 
 const { handleDkpCommands }        = require('./dkpCommands');
 const { handleCurrencyCommands }   = require('./currencyCommands');

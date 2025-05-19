@@ -1,4 +1,4 @@
-// utils/generalUtils.js
+//utils/generalUtils.js
 
 const validator = require('validator');
 const { createErrorEmbed } = require('./embeds');

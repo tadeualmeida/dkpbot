@@ -1,4 +1,4 @@
-// slashcommands/configSlash.js
+//slashcommands/configSlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const configCommand = new SlashCommandBuilder()

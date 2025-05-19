@@ -1,4 +1,4 @@
-// slashcommands/eventSlash.js
+//slashcommands/eventSlash.js
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
 

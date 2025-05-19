@@ -1,4 +1,4 @@
-// commands/reminderCommands.js
+//commands/reminderCommands.js
 
 const { parseDuration, formatDuration } = require('../utils/timeUtils');
 const { loadGuildConfig }                = require('../utils/config');

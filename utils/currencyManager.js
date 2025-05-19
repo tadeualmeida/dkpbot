@@ -1,4 +1,4 @@
-// utils/currencyManager.js
+//utils/currencyManager.js
 const { loadGuildConfig } = require('./config');
 const { refreshCurrencyCache } = require('./cacheManagement');
 
