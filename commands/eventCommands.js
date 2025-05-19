@@ -1,289 +1,280 @@
+// commands/eventCommands.js
+
 const validator = require('validator');
 const {
-    createCombinedEventEmbed,
-    createEventEndedEmbed,
-    createJoinEventEmbed,
-    createMultipleResultsEmbed,
-    createInfoEmbed,
+  createCombinedEventEmbed,
+  createEventEndedEmbed,
+  createJoinEventEmbed,
+  createMultipleResultsEmbed,
+  createInfoEmbed,
+  createErrorEmbed
 } = require('../utils/embeds');
 const Event = require('../schema/Event');
-const { 
-    getDkpParameterFromCache, 
-    refreshDkpPointsCache, 
-    getEventTimerFromCache, 
-    addParticipantToEventCache, 
-    getEventParticipantsFromCache, 
-    clearEventParticipantsCache, 
-    getDkpPointsFromCache, 
-    refreshDkpRankingCache,
-    addActiveEventToCache,
-    removeActiveEventFromCache,
-    getActiveEventsFromCache,
-    getGuildConfigFromCache
+const { resolveGameKey } = require('../utils/resolveGameKey');
+const {
+  getDkpParameterFromCache,
+  getEventTimerFromCache,
+  addParticipantToEventCache,
+  getEventParticipantsFromCache,
+  clearEventParticipantsCache,
+  refreshDkpRankingCache,
+  refreshActiveEventsCache,
+  removeActiveEventFromCache,
+  getActiveEventsFromCache
 } = require('../utils/cacheManagement');
+const { loadGuildConfig } = require('../utils/config');
 const { generateRandomCode } = require('../utils/codeGenerator');
 const Dkp = require('../schema/Dkp');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
 const { scheduleEventEnd, cancelScheduledJob } = require('../utils/scheduler');
-const { createBulkOperations, replyWithError, updateDkpTotal } = require('../utils/generalUtils');
+const { createBulkOperations, replyWithError, updateDkpTotal, getGameName } = require('../utils/generalUtils');
 
+/**
+ * Entry point for all /event and /join commands with per-game resolution
+ */
 async function handleEventCommands(interaction) {
-    try {
-        await interaction.deferReply({ ephemeral: true });
+  if (interaction.commandName === 'event') {
+    // Resolve game for /event subcommands
+    const forced  = interaction.options.getString('game')?.toLowerCase() || null;
+    const gameKey = forced || await resolveGameKey(interaction, interaction.member);
+    if (!gameKey) return;
 
-        if (interaction.commandName === 'event') {
-            const subcommand = interaction.options.getSubcommand(false);
-            if (!subcommand) {
-                await replyWithError(interaction, null, 'No subcommand specified.');
-                return;
-            }
-            switch (subcommand) {
-                case 'start': await startEvent(interaction); break;
-                case 'end': await endEvent(interaction); break;
-                case 'list': await listEvent(interaction); break;
-                case 'cancel': await cancelEvent(interaction); break;
-                case 'rank': await handleEventRank(interaction); break;
-            }
-        } else if (interaction.commandName === 'join') {
-            await joinEvent(interaction);
-        }
-    } catch (error) {
-        console.error('Error handling event commands:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, 'Error', 'An error occurred while handling the event command.');
-        }
+    const sub = interaction.options.getSubcommand(false);
+    switch (sub) {
+      case 'start':  return startEvent(interaction, gameKey);
+      case 'end':    return endEvent(interaction, gameKey);
+      case 'list':   return listEvent(interaction, gameKey);
+      case 'cancel': return cancelEvent(interaction, gameKey);
+      case 'rank':   return handleEventRank(interaction, gameKey);
+      default:
+        return replyWithError(interaction, 'Error', 'Unknown event subcommand.');
     }
+
+  } else if (interaction.commandName === 'join') {
+    // /join only needs the code, gameKey inferred from cache
+    const guildId = interaction.guildId;
+    return joinEvent(interaction, guildId);
+  }
 }
 
-async function startEvent(interaction) {
-    try {
-        const parameterName = validator.escape(interaction.options.getString('parameter'));
-        const guildId = interaction.guildId;
-        const [dkpParameter, eventTimer, activeEvents, guildConfig] = await Promise.all([
-            getDkpParameterFromCache(guildId, parameterName),
-            getEventTimerFromCache(guildId),
-            getActiveEventsFromCache(guildId),
-            getGuildConfigFromCache(guildId)
-        ]);
+// /event start
+async function startEvent(interaction, gameKey) {
+  const guildId = interaction.guildId;
+  await interaction.deferReply({ ephemeral: true });
 
-        if (!dkpParameter) {
-            return await replyWithError(interaction, null, `No DKP parameter found with name '${parameterName}'.`);
-        }
+  const parameterName = validator.escape(interaction.options.getString('parameter'));
+  const [dkpParam, timer, activeEvents, cfg] = await Promise.all([
+    getDkpParameterFromCache(guildId, gameKey, parameterName),
+    getEventTimerFromCache(guildId, gameKey),
+    getActiveEventsFromCache(guildId, gameKey),
+    loadGuildConfig(guildId)
+  ]);
 
-        if (activeEvents.some(event => event.parameterName === parameterName && event.isActive)) {
-            return await replyWithError(interaction, null, `An event with the parameter '${parameterName}' is already active.`);
-        }
+  if (!dkpParam) {
+    return replyWithError(interaction, 'Error', `No DKP parameter '${parameterName}'.`);
+  }
+  if (activeEvents.some(e => e.parameterName === parameterName && e.isActive)) {
+    return replyWithError(interaction, 'Error', `An event for '${parameterName}' is already active.`);
+  }
 
-        const eventCode = generateRandomCode();
-        const userId = interaction.user.id;
-        const userDisplayName = interaction.member ? interaction.member.displayName : interaction.user.username;
-        const userDkp = await getDkpPointsFromCache(guildId, userId);
-        const totalPoints = userDkp ? userDkp.points + dkpParameter.points : dkpParameter.points;
+  const code    = generateRandomCode();
+  const userId  = interaction.user.id;
+  const display = interaction.member.displayName;
+  const rec     = await Dkp.findOne({ guildId, gameKey, userId });
+  const initial = rec ? rec.points : 0;
 
-        const newEvent = new Event({ guildId, parameterName, code: eventCode, participants: [], isActive: true });
-        await newEvent.save();
-        addActiveEventToCache(guildId, newEvent);
+  // Create & cache the event
+  const evt = new Event({ guildId, gameKey, parameterName, code, participants: [], isActive: true });
+  await evt.save();
+  await refreshActiveEventsCache(guildId, gameKey);
 
-        addParticipantToEventCache(guildId, eventCode, { userId, username: userDisplayName, discordUsername: interaction.user.username, joinedAt: new Date() });
-        await scheduleEventEnd(eventCode, parameterName, guildId, interaction, eventTimer);
+  // Add the starter as participant
+  addParticipantToEventCache(guildId, gameKey, code, {
+    userId,
+    username: display,
+    discordUsername: interaction.user.username,
+    joinedAt: new Date()
+  });
 
-        const combinedEventEmbed = createCombinedEventEmbed(parameterName, eventCode, dkpParameter, { points: totalPoints }, guildConfig);
-        const guildName = guildConfig?.guildName ? guildConfig.guildName.toUpperCase() : 'Event';
-        const message = `User **${userDisplayName}** has started an event with parameter **${parameterName}**.\n\n${guildName} CODE: **${eventCode}**`;
+  // Schedule its end
+  await scheduleEventEnd(guildId, gameKey, code, parameterName, timer, interaction);
 
-        await interaction.editReply({ embeds: [combinedEventEmbed], ephemeral: true });
-        await sendMessageToConfiguredChannels(interaction, message, 'event');
-    } catch (error) {
-        console.error('Error starting event:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while starting the event.');
-        }
-    }
+  // Reply to starter
+  const gameName = await getGameName(guildId, gameKey);
+  const embed = createCombinedEventEmbed(
+    parameterName,
+    code,
+    dkpParam,
+    { points: initial + dkpParam.points },
+    cfg
+  );
+  await interaction.editReply({ embeds: [embed] });
+
+  // Log
+  const msg = `**${display}** started event **${parameterName}** for **${gameName}**, code **${code}**.`;
+  await sendMessageToConfiguredChannels(interaction, msg, 'event', gameKey);
 }
 
-async function endEvent(interaction) {
-    try {
-        const eventCodeToEnd = validator.escape(interaction.options.getString('code'));
-        const guildId = interaction.guildId;
+// /event end
+async function endEvent(interaction, gameKey) {
+  const guildId = interaction.guildId;
+  await interaction.deferReply({ ephemeral: true });
 
-        const eventToEnd = getActiveEventsFromCache(guildId).find(event => event.code === eventCodeToEnd && event.isActive);
-        if (!eventToEnd) return await replyWithError(interaction, null, "Event not found or already ended.");
+  const code   = validator.escape(interaction.options.getString('code')).toUpperCase();
+  const events = await getActiveEventsFromCache(guildId, gameKey);
+  const act    = events.find(e => e.code === code && e.isActive);
+  if (!act) {
+    return replyWithError(interaction, 'Error', 'Event not found or already ended.');
+  }
 
-        const participants = getEventParticipantsFromCache(guildId, eventCodeToEnd);
-        eventToEnd.participants = participants;
-        eventToEnd.isActive = false;
-        await Event.updateOne({ guildId, code: eventCodeToEnd }, { $set: { isActive: false, participants } });
+  const parts = await getEventParticipantsFromCache(guildId, gameKey, code) || [];
+  act.participants = parts;
+  act.isActive     = false;
+  await Event.updateOne(
+    { guildId, gameKey, code },
+    { isActive: false, participants: parts }
+  );
 
-        const dkpParameter = await getDkpParameterFromCache(guildId, eventToEnd.parameterName);
-        if (!dkpParameter || typeof dkpParameter.points !== 'number') return await replyWithError(interaction, null, "Invalid DKP parameter points.");
+  const dkpParam = await getDkpParameterFromCache(guildId, gameKey, act.parameterName);
+  const changes  = parts.map(p => ({ userId: p.userId, pointChange: dkpParam.points }));
+  const ops      = createBulkOperations(changes, guildId, gameKey, dkpParam.points, `Event ${code} ended`);
+  if (ops.length) {
+    await Dkp.bulkWrite(ops);
+    await updateDkpTotal(parts.length * dkpParam.points, guildId, gameKey);
+  }
 
-        const bulkOperations = createBulkOperations(participants, guildId, dkpParameter.points, `Event ${eventCodeToEnd} ended`);
-        if (bulkOperations.length > 0) {
-            await Dkp.bulkWrite(bulkOperations);
-            await updateDkpTotal(bulkOperations.length * dkpParameter.points, guildId);
-        }
+  await interaction.editReply({ embeds: [createEventEndedEmbed()] });
+  const users    = parts.map(p => p.username).join(', ') || 'None';
+  const gameName = await getGameName(guildId, gameKey);
+  const log      = `Event **${code}** ended for **${gameName}**. Participants: ${users}.`;
+  await sendMessageToConfiguredChannels(interaction, log, 'event', gameKey);
 
-        const participantMentions = participants.map(participant => participant.username).join('**, **');
-        const participantCount = participants.length;
-
-        await interaction.editReply({ embeds: [createEventEndedEmbed()], ephemeral: true });
-        await sendMessageToConfiguredChannels(interaction, `User **${interaction.member.displayName}** has ended an event with parameter **${eventToEnd.parameterName}**.\nEvent code: **${eventCodeToEnd}**.\nParticipants (${participantCount}): **${participantMentions || 'No participants.'}**`, 'event');
-        await refreshDkpPointsCache(guildId);
-        await refreshDkpRankingCache(guildId);
-
-        clearEventParticipantsCache(guildId, eventCodeToEnd);
-        removeActiveEventFromCache(guildId, eventCodeToEnd);
-        cancelScheduledJob(guildId, eventCodeToEnd);
-    } catch (error) {
-        console.error('Error ending event:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while ending the event.');
-        }
-    }
+  clearEventParticipantsCache(guildId, gameKey, code);
+  removeActiveEventFromCache(guildId, gameKey, code);
+  await cancelScheduledJob(guildId, gameKey, code);
 }
 
-async function cancelEvent(interaction) {
-    try {
-        const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
-        const guildId = interaction.guildId;
+// /event list
+async function listEvent(interaction, gameKey) {
+  const guildId = interaction.guildId;
+  await interaction.deferReply({ ephemeral: true });
 
-        const eventToCancel = getActiveEventsFromCache(guildId).find(event => event.code === eventCode && event.isActive);
-        if (!eventToCancel) return await replyWithError(interaction, null, 'No active event found with the provided code.');
+  const code = validator.escape(interaction.options.getString('code')).toUpperCase();
+  let evt = (await getActiveEventsFromCache(guildId, gameKey))
+              .find(e => e.code === code)
+          || await Event.findOne({ guildId, gameKey, code });
+  if (!evt) {
+    return interaction.editReply({ content: `Event ${code} not found.`, ephemeral: true });
+  }
 
-        eventToCancel.isActive = false;
-        await Event.updateOne({ guildId, code: eventCode }, { $set: { isActive: false } });
+  const parts = await getEventParticipantsFromCache(guildId, gameKey, code);
+  const names = Array.isArray(parts) ? parts.map(p => p.username) : evt.participants.map(p => p.username);
 
-        const participants = getEventParticipantsFromCache(guildId, eventCode);
-        const participantMentions = participants.map(participant => participant.username).join('**, **');
-        const participantCount = participants.length;
-
-        await interaction.editReply({ embeds: [createInfoEmbed('Event Canceled', `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled.\nParticipants (${participantCount}): **${participantMentions || 'No participants.'}`)], ephemeral: true });
-        await sendMessageToConfiguredChannels(interaction, `The event with parameter **${eventToCancel.parameterName}** and code **${eventCode}** has been canceled by **${interaction.member.displayName}**.\nParticipants (${participantCount}): **${participantMentions || 'No participants.'}`, 'event');
-        await refreshDkpPointsCache(guildId);
-        await refreshDkpRankingCache(guildId);
-
-        clearEventParticipantsCache(guildId, eventCode);
-        removeActiveEventFromCache(guildId, eventCode);
-        cancelScheduledJob(guildId, eventCode);
-    } catch (error) {
-        console.error('Error canceling event:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while canceling the event.');
-        }
-    }
+  await interaction.editReply({
+    embeds: [createMultipleResultsEmbed('info', `Participants — ${code}`, names)]
+  });
 }
 
-async function joinEvent(interaction) {
-    try {
-        const eventCode = validator.escape(interaction.options.getString('code')).toUpperCase();
-        const guildId = interaction.guildId;
+// /event cancel
+async function cancelEvent(interaction, gameKey) {
+  const guildId = interaction.guildId;
+  await interaction.deferReply({ ephemeral: true });
 
-        const event = getActiveEventsFromCache(guildId).find(event => event.code === eventCode && event.isActive);
-        if (!event) return await replyWithError(interaction, null, 'No active event found with the provided code.');
+  const code = validator.escape(interaction.options.getString('code')).toUpperCase();
+  const events = await getActiveEventsFromCache(guildId, gameKey);
+  const evt    = events.find(e => e.code === code && e.isActive);
+  if (!evt) {
+    return replyWithError(interaction, 'Error', 'No active event with that code.');
+  }
 
-        const participants = getEventParticipantsFromCache(guildId, eventCode);
-        if (participants.some(p => p.userId === interaction.user.id)) {
-            return await replyWithError(interaction, null, 'You have already joined this event.');
-        }
+  evt.isActive = false;
+  await Event.updateOne({ guildId, gameKey, code }, { isActive: false });
 
-        const userId = interaction.user.id;
-        const userDisplayName = interaction.member ? interaction.member.displayName : interaction.user.username;
-        const dkpParameter = await getDkpParameterFromCache(guildId, event.parameterName);
-        const userDkp = await getDkpPointsFromCache(guildId, userId);
-        const totalPoints = userDkp ? userDkp.points + dkpParameter.points : dkpParameter.points;
+  const parts = await getEventParticipantsFromCache(guildId, gameKey, code) || [];
+  const names = parts.map(p => p.username);
 
-        addParticipantToEventCache(guildId, eventCode, {
-            userId,
-            username: userDisplayName,
-            discordUsername: interaction.user.username,
-            joinedAt: new Date()
-        });
+  await interaction.editReply({
+    embeds: [createInfoEmbed('Event Canceled', `Event ${code} canceled. Participants: ${names.join(', ')}`)]
+  });
+  const gameName = await getGameName(guildId, gameKey);
+  const log = `Event **${code}** canceled by **${interaction.member.displayName}** on **${gameName}**.`;
+  await sendMessageToConfiguredChannels(interaction, log, 'event', gameKey);
 
-        await interaction.editReply({ embeds: [createJoinEventEmbed(dkpParameter, { points: totalPoints }, eventCode)], ephemeral: true });
-    } catch (error) {
-        console.error('Error joining event:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while joining the event.');
-        }
-    }
+  clearEventParticipantsCache(guildId, gameKey, code);
+  removeActiveEventFromCache(guildId, gameKey, code);
+  await cancelScheduledJob(guildId, gameKey, code);
 }
 
-async function listEvent(interaction) {
-    try {
-        const eventCode = validator.escape(interaction.options.getString('code'));
-        const guildId = interaction.guildId;
+// /join
+async function joinEvent(interaction, guildId) {
+  await interaction.deferReply({ ephemeral: true });
 
-        const event = getActiveEventsFromCache(guildId).find(event => event.code === eventCode) || await Event.findOne({ guildId, code: eventCode });
-        if (!event) {
-            await interaction.editReply({ content: `Event with code ${eventCode} not found.`, ephemeral: true });
-            return;
-        }
+  const code = validator.escape(interaction.options.getString('code')).toUpperCase();
 
-        const participants = getEventParticipantsFromCache(guildId, eventCode).length > 0 ? getEventParticipantsFromCache(guildId, eventCode) : event.participants;
-        await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Participants for Event ${eventCode}`, participants.map(p => p.username))], ephemeral: true });
-    } catch (error) {
-        console.error('Error listing event participants:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while listing the event participants.');
-        }
-    }
+  // 1) Look across *all* games for an active event with that code
+  const allActive = await getActiveEventsFromCache(guildId);
+  const evtEntry = allActive.find(e => e.code === code && e.isActive);
+  if (!evtEntry) {
+    return replyWithError(interaction, 'Error', 'No active event found with that code.');
+  }
+  const gameKey = evtEntry.gameKey;
+
+  // 2) Pull the participants array from cache
+  const parts = await getEventParticipantsFromCache(guildId, gameKey, code) || [];
+
+  // 3) Now safe to check `.some()`
+  if (parts.some(p => p.userId === interaction.user.id)) {
+    return replyWithError(interaction, 'Error', 'You have already joined this event.');
+  }
+
+  // 4) Fetch current DKP
+  const userId   = interaction.user.id;
+  const display  = interaction.member.displayName;
+  const dkpParam = await getDkpParameterFromCache(guildId, gameKey, evtEntry.parameterName);
+  const rec      = await Dkp.findOne({ guildId, gameKey, userId });
+  const current  = rec ? rec.points : 0;
+
+  // 5) Add them into the in-memory list
+  addParticipantToEventCache(guildId, gameKey, code, {
+    userId,
+    username: display,
+    discordUsername: interaction.user.username,
+    joinedAt: new Date()
+  });
+
+  // 6) Send the confirmation embed
+  const embed = createJoinEventEmbed(dkpParam, { points: current + dkpParam.points }, code);
+  await interaction.editReply({ embeds: [embed] });
 }
 
-async function handleEventRank(interaction) {
-    try {
-        const guildId = interaction.guildId;
-        const parameterName = interaction.options.getString('parameter');
+// /event rank
+async function handleEventRank(interaction, gameKey) {
+  const guildId = interaction.guildId;
+  await interaction.deferReply({ ephemeral: true });
 
-        const dkpParameter = await getDkpParameterFromCache(guildId, parameterName);
-        if (!dkpParameter) {
-            return await interaction.editReply({ content: `No DKP parameter found with name '${parameterName}'.`, ephemeral: true });
-        }
+  const param = interaction.options.getString('parameter');
+  const dkpParam = await getDkpParameterFromCache(guildId, gameKey, param);
+  if (!dkpParam) {
+    return replyWithError(interaction, 'Error', `No DKP parameter '${param}'.`);
+  }
 
-        const events = await Event.find({ guildId, parameterName });
+  const events = await Event.find({ guildId, gameKey, parameterName: param });
+  if (!events.length) {
+    return interaction.editReply({
+      embeds: [createInfoEmbed('No Events', `No events found for parameter '${param}'.`)]
+    });
+  }
 
-        if (events.length === 0) {
-            return await interaction.editReply({ embeds: [createInfoEmbed('No Events Found', `No events found for parameter '${parameterName}'.`)], ephemeral: true });
-        }
+  const scores = {}; for (const ev of events) ev.participants.forEach(p => {
+    scores[p.userId] = scores[p.userId] || { username: p.username, points: 0 };
+    scores[p.userId].points += dkpParam.points;
+  });
 
-        const participantScores = {};
-        events.forEach(event => {
-            event.participants.forEach(participant => {
-                if (!participantScores[participant.userId]) {
-                    participantScores[participant.userId] = { username: participant.username, points: 0 };
-                }
-                participantScores[participant.userId].points += dkpParameter.points;
-            });
-        });
+  const list = Object.values(scores)
+    .sort((a, b) => b.points - a.points)
+    .map((u, i) => `${i + 1}. **${u.username}** — ${u.points} points`);
 
-        const sortedParticipants = Object.values(participantScores).sort((a, b) => b.points - a.points);
-
-        const descriptions = sortedParticipants.map((participant, index) => `${index + 1}. **${participant.username}** - ${participant.points} points`);
-
-        if (descriptions.length === 0) {
-            await interaction.editReply({ embeds: [createInfoEmbed('No Participants', 'No participants found for the specified parameter.')], ephemeral: true });
-        } else {
-            const embedTitle = `DKP Ranking for '${parameterName}'`;
-            const embeds = createRankEmbeds(descriptions, embedTitle);       
-            await interaction.editReply({ embeds, ephemeral: true });
-        }
-    } catch (error) {
-        console.error('Error handling event rank:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await replyWithError(interaction, null, 'An error occurred while processing the event rank.');
-        }
-    }
-}
-
-function createRankEmbeds(descriptions, title) {
-    const embeds = [];
-    const chunkSize = 50;
-
-    for (let i = 0; i < descriptions.length; i += chunkSize) {
-        const chunk = descriptions.slice(i, i + chunkSize);
-        embeds.push(createMultipleResultsEmbed('info', `${title} - ${i + 1} to ${i + chunk.length}`, chunk));
-    }
-
-    return embeds;
+  await interaction.editReply({ embeds: [createMultipleResultsEmbed('info', `Event Rank — ${param}`, list)] });
 }
 
 module.exports = { handleEventCommands };

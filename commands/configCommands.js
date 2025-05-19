@@ -1,193 +1,333 @@
-// configCommands.js
+// commands/configCommands.js
 
+const { loadGuildConfig, invalidateGuildConfig } = require('../utils/config');
 const {
-    getGuildCache,
-    refreshDkpParametersCache,
-    refreshDkpMinimumCache,
-    getDkpMinimumFromCache,
-    getChannelsFromCache,
-    getEventTimerFromCache,
-    refreshEventTimerCache,
-    refreshGuildConfigCache,
-    refreshRoleConfigCache
+  refreshDkpParametersCache,
+  refreshDkpMinimumCache,
+  refreshEventTimerCache,
+  refreshCurrencyCache,
+  refreshChannelsCache,
+  refreshRoleConfigCache,
+  refreshGuildConfigCache
 } = require('../utils/cacheManagement');
 const {
-    createDkpParameterDefinedEmbed,
-    createMultipleResultsEmbed,
-    createInfoEmbed,
-    createErrorEmbed
+  createMultipleResultsEmbed,
+  createInfoEmbed,
+  createErrorEmbed
 } = require('../utils/embeds');
-const { replyWithError } = require('../utils/generalUtils');
 const validator = require('validator');
-const GuildConfig = require('../schema/GuildConfig');
 
 async function handleConfigCommands(interaction) {
-    const guildId = interaction.guildId;
-    const subcommand = interaction.options.getSubcommand();
+  const guildId = interaction.guildId;
+  const sub = interaction.options.getSubcommand();
 
-    switch (subcommand) {
-        case 'dkp':
-            await handleConfigDkp(interaction, guildId);
-            break;
-        case 'channel':
-            await handleConfigChannel(interaction, guildId);
-            break;
-        case 'role':
-            await handleSetRoleCommand(interaction, guildId);
-            break;
-        case 'show':
-            await handleConfigShow(interaction, guildId);
-            break;
-        case 'event':
-            await handleConfigEvent(interaction, guildId);
-            break;
-        case 'guildname':
-            await handleSetGuildName(interaction, guildId);
-            break;
+  // Load or initialize guild config
+  const cfg = await loadGuildConfig(guildId);
+
+  // Determine if this subcommand needs a game context
+  const needsGame = ['role','dkp','channel','reminder','show','event'].includes(sub);
+  let gameKey, gameCfg;
+  if (needsGame) {
+    gameKey = interaction.options.getString('game')?.toLowerCase();
+    gameCfg = cfg.games.find(g => g.key === gameKey);
+    if (!gameCfg) {
+      return interaction.reply({
+        embeds: [ createErrorEmbed(`Game \`${gameKey}\` not found.`) ],
+        ephemeral: true
+      });
     }
-}
+  }
 
-async function handleConfigDkp(interaction, guildId) {
-    const action = interaction.options.getString('action');
-    const name = interaction.options.getString('name') ? validator.escape(interaction.options.getString('name').toLowerCase()) : null;
-    const points = interaction.options.getInteger('points');
+  // Dispatch by subcommand
+  switch (sub) {
+    // ---- ROLE ----
+    case 'role': {
+      const group = interaction.options.getString('commandgroup');
+      const role  = interaction.options.getRole('role');
+      gameCfg.roles[group] = [role.id];
+      break;
+    }
 
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
+    // ---- DKP ----
+    case 'dkp': {
+      const action = interaction.options.getString('action');
+      const nameOpt = interaction.options.getString('name');
+      const name = nameOpt ? validator.escape(nameOpt.toLowerCase()) : null;
+      const pts  = interaction.options.getInteger('points');
 
-    switch (action) {
+      // Validation
+      if ((action === 'add' || action === 'edit') && (!name || pts == null)) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Name and points are required for add/edit.') ],
+          ephemeral: true
+        });
+      }
+      if (action === 'remove' && !name) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Name is required to remove parameter.') ],
+          ephemeral: true
+        });
+      }
+      if (action === 'minimum' && pts == null) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Points value is required to set minimum.') ],
+          ephemeral: true
+        });
+      }
+
+      // Modify parameters
+      switch (action) {
         case 'add':
-        case 'edit':
-            if (points == null) return replyWithError(interaction, null, "You must specify a valid points value.");
-            const paramIndex = guildConfig.dkpParameters.findIndex(param => param.name === name);
-            if (paramIndex !== -1) {
-                guildConfig.dkpParameters[paramIndex].points = points;
-            } else {
-                guildConfig.dkpParameters.push({ name, points });
-            }
-            await saveAndRefresh(guildConfig, guildId, 'added', name, points, refreshDkpParametersCache, interaction);
-            break;
-
-        case 'remove':
-            guildConfig.dkpParameters = guildConfig.dkpParameters.filter(param => param.name !== name);
-            await saveAndRefresh(guildConfig, guildId, 'removed', name, null, refreshDkpParametersCache, interaction);
-            break;
-
-        case 'minimum':
-            if (points == null) return replyWithError(interaction, null, "You must specify a valid minimum points value.");
-            guildConfig.minimumPoints = points;
-            await saveAndRefresh(guildConfig, guildId, null, null, null, refreshDkpMinimumCache, interaction, 'Minimum DKP Points Set', `Minimum DKP points set to ${points} successfully.`);
-            break;
+        case 'edit': {
+          const idx = gameCfg.dkpParameters.findIndex(p => p.name === name);
+          if (idx !== -1) {
+            gameCfg.dkpParameters[idx].points = pts;
+          } else {
+            gameCfg.dkpParameters.push({ name, points: pts });
+          }
+          break;
+        }
+        case 'remove': {
+          gameCfg.dkpParameters = gameCfg.dkpParameters.filter(p => p.name !== name);
+          break;
+        }
+        case 'minimum': {
+          gameCfg.minimumPoints = pts;
+          break;
+        }
+      }
+      break;
     }
-}
 
-async function handleConfigChannel(interaction, guildId) {
-    const action = interaction.options.getString('action');
-    const channel = interaction.options.getChannel('channel');
+    // ---- CHANNEL ----
+    case 'channel': {
+      // now uses “type” (log | reminder) instead of “action”
+      const type    = interaction.options.getString('type');    // ‘log’ or ‘reminder’
+      const channel = interaction.options.getChannel('channel');
+      if (!channel) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('You must specify a channel.') ],
+          ephemeral: true
+        });
+      }
 
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
+      // assign to the proper field
+      if (!['log','reminder'].includes(type)) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Invalid channel type; must be “log” or “reminder”.') ],
+          ephemeral: true
+        });
+      }
 
-    switch (action) {
-        case 'add':
-            if (guildConfig.channels.includes(channel.id)) return replyWithError(interaction, null, 'This channel is already added.');
-            guildConfig.channels.push(channel.id);
-            await saveAndRefresh(guildConfig, guildId, 'added', `Channel <#${channel.id}>`, null, refreshGuildConfigCache, interaction);
-            break;
-
-        case 'remove':
-            if (!guildConfig.channels.includes(channel.id)) return replyWithError(interaction, null, 'This channel is not configured.');
-            guildConfig.channels = guildConfig.channels.filter(id => id !== channel.id);
-            await saveAndRefresh(guildConfig, guildId, 'removed', `Channel <#${channel.id}>`, null, refreshGuildConfigCache, interaction);
-            break;
+      gameCfg.channels[type] = channel.id;
+      break;
     }
-}
 
-async function handleConfigShow(interaction, guildId) {
-    const action = interaction.options.getString('action');
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
+    // ---- REMINDER ----
+    case 'reminder': {
+      const action     = interaction.options.getString('action');      // 'add', 'remove', or 'intervals'
+      const paramName  = interaction.options.getString('parameter');   // e.g. 'BOSS-XYZ'
+      const intervals  = interaction.options.getString('intervals');   // e.g. '1h,30m,10m'
+      let actionText;
 
-    switch (action) {
+      // ensure arrays exist
+      gameCfg.reminders ||= [];
+      gameCfg.reminderIntervals ||= [];
+
+      if (action === 'add') {
+        if (!paramName) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Parameter name is required to add.') ],
+            ephemeral: true
+          });
+        }
+        gameCfg.reminders.push(paramName.trim());
+        actionText = 'added';
+      }
+      else if (action === 'remove') {
+        if (!paramName) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Parameter name is required to remove.') ],
+            ephemeral: true
+          });
+        }
+        gameCfg.reminders = gameCfg.reminders.filter(p => p !== paramName.trim());
+        actionText = 'removed';
+      }
+      else if (action === 'intervals') {
+        if (!intervals) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Intervals are required for this action (e.g. `1h,30m,10m`).') ],
+            ephemeral: true
+          });
+        }
+        gameCfg.reminderIntervals = intervals.split(',').map(s => s.trim());
+        actionText = 'intervals set';
+      } else {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Invalid reminder action.') ],
+          ephemeral: true
+        });
+      }
+
+      break;
+    }
+
+    // ---- SHOW ----
+    case 'show': {
+      const action = interaction.options.getString('action');
+      let embed;
+      switch (action) {
         case 'parameters':
-            const descriptions = guildConfig.dkpParameters.map(param => `${param.name}: **${param.points}** points`);
-            await interaction.reply({ embeds: [createMultipleResultsEmbed('info', 'DKP Parameters List', descriptions)], ephemeral: true });
-            break;
+          embed = createMultipleResultsEmbed(
+            'info',
+            'DKP Parameters',
+            gameCfg.dkpParameters.map(p => `• ${p.name}: **${p.points}**`)
+          );
+          break;
 
         case 'channels':
-            const channelList = guildConfig.channels.map(id => `<#${id}>`).join('\n');
-            if (channelList) {
-                await interaction.reply({ embeds: [createInfoEmbed('Configured Channels', channelList)], ephemeral: true });
-            } else {
-                await interaction.reply({ content: 'No channels configured.', ephemeral: true });
-            }
-            break;
+          embed = createInfoEmbed(
+            'Channels',
+            `Log: <#${gameCfg.channels.log || 'none'}>\nReminder: <#${gameCfg.channels.reminder || 'none'}>`
+          );
+          break;
 
         case 'minimum':
-            const minimumDkp = guildConfig.minimumPoints || 'Not set';
-            const description = `Minimum DKP: **${minimumDkp}** points.`;
-            await interaction.reply({ embeds: [createInfoEmbed('Minimum DKP', description)], ephemeral: true });
-            break;
+          embed = createInfoEmbed(
+            'Minimum Points',
+            `**${gameCfg.minimumPoints || 0}**`
+          );
+          break;
 
         case 'event':
-            const eventTimer = guildConfig.eventTimer || 'Not set';
-            const descriptionEvent = `Event Timeout: **${eventTimer}** minutes.`;
-            await interaction.reply({ embeds: [createInfoEmbed('Event Timeout', descriptionEvent)], ephemeral: true });
-            break;
-    }
-}
+          embed = createInfoEmbed(
+            'Event Timer',
+            `**${gameCfg.eventTimer || 0}** minutes`
+          );
+          break;
 
-async function handleConfigEvent(interaction, guildId) {
-    const action = interaction.options.getString('action');
-    const minutes = interaction.options.getInteger('minutes');
+        case 'reminder': {
+          const params = (gameCfg.reminders || [])
+            .map(p => `• ${p}`)
+            .join('\n') || 'None';
+          const ints = (gameCfg.reminderIntervals || [])
+            .join(', ') || 'None';
+          embed = createInfoEmbed(
+            'Reminder Settings',
+            `**Parameters:**\n${params}\n\n**Intervals:**\n${ints}`
+          );
+          break;
+        }
 
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
+        default:
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Invalid show action.') ],
+            ephemeral: true
+          });
+      }
 
-    if (action === 'timer') {
-        if (minutes == null || minutes <= 0) return replyWithError(interaction, null, "You must specify a valid timeout duration in minutes.");
-        guildConfig.eventTimer = minutes;
-        await saveAndRefresh(guildConfig, guildId, null, null, null, refreshEventTimerCache, interaction, 'Event Timeout Set', `Event timeout set to ${minutes} minutes successfully.`);
-    }
-}
-
-async function handleSetRoleCommand(interaction, guildId) {
-    const commandGroup = interaction.options.getString('commandgroup');
-    const role = interaction.options.getRole('role');
-
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
-
-    const existingRoleConfig = guildConfig.roles.find(r => r.commandGroup === commandGroup);
-    if (existingRoleConfig) {
-        existingRoleConfig.roleId = role.id;
-    } else {
-        guildConfig.roles.push({ commandGroup, roleId: role.id });
+      return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    await saveAndRefresh(guildConfig, guildId, null, null, null, () => {
-        refreshGuildConfigCache(guildId);
-        refreshRoleConfigCache(guildId);
-    }, interaction, 'Role Set', `Role **${role.name}** has been set for command group **${commandGroup}**.`);
-}
-
-async function handleSetGuildName(interaction, guildId) {
-    const guildName = interaction.options.getString('name');
-    const guildConfig = await GuildConfig.findOne({ guildId });
-    if (!guildConfig) return replyWithError(interaction, null, "Guild configuration not found.");
-
-    guildConfig.guildName = guildName;
-    await saveAndRefresh(guildConfig, guildId, null, null, null, refreshGuildConfigCache, interaction, 'Guild Name Set', `The guild name has been set to **${guildName}**.`);
-}
-
-async function saveAndRefresh(guildConfig, guildId, actionText, name, points, refreshCacheFn, interaction, title = null, description = null) {
-    await guildConfig.save();
-    await refreshCacheFn(guildId);
-    if (title && description) {
-        await interaction.reply({ embeds: [createInfoEmbed(title, description)], ephemeral: true });
-    } else {
-        await interaction.reply({ embeds: [createDkpParameterDefinedEmbed(name, points, actionText)], ephemeral: true });
+    // ---- EVENT TIMER ----
+    case 'event': {
+      const minutes = interaction.options.getInteger('minutes');
+      if (!minutes || minutes <= 0) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Valid minutes are required.') ],
+          ephemeral: true
+        });
+      }
+      gameCfg.eventTimer = minutes;
+      break;
     }
+
+    // ---- GAME MANAGEMENT ----
+    case 'game': {
+      const action   = interaction.options.getString('action');
+      const key      = interaction.options.getString('key')?.toLowerCase();
+      const name     = interaction.options.getString('name');
+      const currency = interaction.options.getString('currency');
+
+      if (action === 'add') {
+        if (!key || !name || !currency) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Key, name and currency are required to add a game.') ],
+            ephemeral: true
+          });
+        }
+        cfg.games.push({
+          key,
+          name,
+          roles: { admin: [], mod: [], user: [] },
+          channels: { log: null, reminder: null },
+          dkpParameters: [],
+          minimumPoints: 0,
+          eventTimer: 10,
+          currency: { name: currency, total: 0 },
+          totalDkp: 0,
+          reminders: [],
+          reminderIntervals: []
+        });
+      }
+      else if (action === 'remove') {
+        if (!key) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Key is required to remove a game.') ],
+            ephemeral: true
+          });
+        }
+        cfg.games = cfg.games.filter(g => g.key !== key);
+      }
+      else if (action === 'rename') {
+        if (!key || !name) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Key and new name are required to rename a game.') ],
+            ephemeral: true
+          });
+        }
+        const target = cfg.games.find(g => g.key === key);
+        if (target) target.name = name;
+      }
+      break;
+    }
+
+    // ---- GUILD NAME ----
+    case 'guildname': {
+      const nameVal = interaction.options.getString('name');
+      cfg.guildName = nameVal;
+      break;
+    }
+
+    default:
+      return interaction.reply({
+        embeds: [ createErrorEmbed('Unknown config subcommand.') ],
+        ephemeral: true
+      });
+  }
+
+  // Save and refresh cache
+  await cfg.save();
+  invalidateGuildConfig(guildId);
+  await refreshGuildConfigCache(guildId);
+
+  // If we updated a specific game, refresh its caches
+  if (needsGame) {
+    await Promise.all([
+      refreshDkpParametersCache(guildId, gameKey),
+      refreshDkpMinimumCache(guildId, gameKey),
+      refreshEventTimerCache(guildId, gameKey),
+      refreshCurrencyCache(guildId, gameKey),
+      refreshChannelsCache(guildId, gameKey),
+      refreshRoleConfigCache(guildId, gameKey)
+    ]);
+  }
+
+  return interaction.reply({
+    embeds: [ createInfoEmbed('Configuration Updated', 'Settings saved successfully.') ],
+    ephemeral: true
+  });
 }
 
 module.exports = { handleConfigCommands };

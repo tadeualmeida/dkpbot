@@ -1,82 +1,135 @@
-// generalUtils.js
+// utils/generalUtils.js
 
 const validator = require('validator');
 const { createErrorEmbed } = require('./embeds');
-const GuildConfig = require('../schema/GuildConfig'); // Certifique-se de importar o GuildConfig
+const { loadGuildConfig, invalidateGuildConfig } = require('../utils/config');
 
+/**
+ * participants: [{ userId, pointChange }]
+ * guildId: string
+ * gameKey: string
+ * dkpPoints: number (positivo ou negativo)
+ * description: string
+ */
 function isPositiveInteger(value) {
-    return validator.isInt(value.toString(), { min: 1 });
+  return Number.isInteger(value) && value > 0;
 }
 
-function createBulkOperations(participants, guildId, dkpPoints, description = '') {
-    if (!Array.isArray(participants)) {
-        throw new TypeError("participants must be an array");
-    }
-    if (typeof dkpPoints !== 'number') {
-        throw new TypeError("dkpPoints must be a number");
-    }
+function createBulkOperations(participants, guildId, gameKey, dkpPoints, description = '') {
+  if (!Array.isArray(participants)) {
+    throw new TypeError("participants must be an array");
+  }
+  if (typeof dkpPoints !== 'number') {
+    throw new TypeError("dkpPoints must be a number");
+  }
 
-    return participants.map(participant => ({
-        updateOne: {
-            filter: { guildId, userId: participant.userId },
-            update: {
-                $inc: { points: dkpPoints },
-                $push: { transactions: { type: dkpPoints > 0 ? 'add' : 'remove', amount: dkpPoints, description } }
-            },
-            upsert: true
+  return participants.map(participant => ({
+    updateOne: {
+      filter: { guildId, gameKey, userId: participant.userId },
+      update: {
+        $inc: { points: participant.pointChange },
+        $push: {
+          transactions: {
+            type: participant.pointChange > 0 ? 'add' : 'remove',
+            amount: Math.abs(participant.pointChange),
+            description
+          }
         }
-    }));
+      },
+      upsert: true
+    }
+  }));
 }
 
 async function fetchGuildMember(guild, userId) {
-    return await guild.members.fetch(userId).catch(() => null);
+  return guild.members.fetch(userId).catch(() => null);
 }
 
 async function fetchUserToModify(userID, interaction) {
-    if (!userID.match(/^\d+$/)) {
-        const userToModify = interaction.guild.members.cache.find(member => validator.escape(member.user.username) === validator.escape(userID));
-        return userToModify || null;
-    } else {
-        return await interaction.guild.members.fetch(userID).catch(() => null);
-    }
+  if (!/^\d+$/.test(userID)) {
+    const username = validator.escape(userID);
+    return interaction.guild.members.cache.find(m =>
+      validator.escape(m.user.username) === username
+    ) || null;
+  }
+  return interaction.guild.members.fetch(userID).catch(() => null);
 }
 
-async function getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, getDkpPointsFromCache, getGuildCache) {
-    let pointChange = isAdd ? pointsToModify : -pointsToModify;
-    const userDkp = await getDkpPointsFromCache(guildId, userID) || await Dkp.create({ userId: userID, guildId, points: 0 });
-    if (!isAdd && userDkp.points + pointChange < 0) {
-        pointChange = -userDkp.points;
+/**
+ * Retorna { pointChange, userDkp }
+ * Só tenta escrever em cache se getGuildCache for função.
+ */
+async function getUserDkpChanges(
+  guildId,
+  gameKey,
+  userID,
+  pointsToModify,
+  isAdd,
+  Dkp,
+  getDkpPointsFromCache,
+  getGuildCache
+) {
+  let pointChange = isAdd ? pointsToModify : -pointsToModify;
+
+  // busca ou cria registro DKP
+  let userDkp = await getDkpPointsFromCache(guildId, gameKey, userID);
+  if (!userDkp) {
+    userDkp = await Dkp.create({ guildId, gameKey, userId: userID, points: 0 });
+  }
+
+  // não deixa ficar negativo
+  if (!isAdd && userDkp.points + pointChange < 0) {
+    pointChange = -userDkp.points;
+  }
+  userDkp.points += pointChange;
+
+  // se nos passaram um getGuildCache válido, atualiza o cache
+  if (typeof getGuildCache === 'function') {
+    const cache = getGuildCache(guildId);
+    if (cache && typeof cache.set === 'function') {
+      cache.set(`dkpPoints:${gameKey}:${userID}`, userDkp);
     }
-    userDkp.points += pointChange;
-    getGuildCache(guildId).set(`${guildId}_${userID}`, userDkp);
-    return { pointChange, userDkp };
+  }
+
+  return { pointChange, userDkp };
 }
 
 async function replyWithError(interaction, title, description) {
-    if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ embeds: [createErrorEmbed(title, description)], ephemeral: true });
-    } else {
-        await interaction.reply({ embeds: [createErrorEmbed(title, description)], ephemeral: true });
-    }
+  const embed = createErrorEmbed(title, description);
+  if (interaction.deferred || interaction.replied) {
+    return interaction.followUp({ embeds: [embed], ephemeral: true });
+  }
+  return interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
+/**
+ * Incrementa totalDkp dentro do objeto de jogo no GuildConfig
+ */
+async function updateDkpTotal(pointsToModify, guildId, gameKey) {
+  const cfg = await loadGuildConfig(guildId);
+  const game = cfg.games.find(g => g.key === gameKey);
+  if (!game) return null;
 
-// Função para atualizar o total de DKP
-async function updateDkpTotal(pointsToModify, guildId) {
-    const result = await GuildConfig.findOneAndUpdate(
-        { guildId: guildId },
-        { $inc: { totalDkp: pointsToModify } },
-        { new: true, upsert: true }
-    );
-    return result.totalDkp;
+  game.totalDkp = (game.totalDkp || 0) + pointsToModify;
+  await cfg.save();
+  invalidateGuildConfig(guildId);
+  return game.totalDkp;
 }
 
-module.exports = { 
-    isPositiveInteger, 
-    createBulkOperations, 
-    fetchGuildMember, 
-    fetchUserToModify, 
-    getUserDkpChanges, 
-    replyWithError, 
-    updateDkpTotal 
+// Helper to fetch gameName from config
+async function getGameName(guildId, gameKey) {
+  const cfg = await loadGuildConfig(guildId);
+  const game = cfg.games.find(g => g.key === gameKey);
+  return game?.name || gameKey;
+}
+
+module.exports = {
+  createBulkOperations,
+  fetchGuildMember,
+  fetchUserToModify,
+  getUserDkpChanges,
+  replyWithError,
+  updateDkpTotal,
+  isPositiveInteger,
+  getGameName
 };

@@ -1,163 +1,73 @@
-const { handleDkpCommands } = require('./dkpCommands');
-const { handleCrowCommands } = require('./crowCommands');
-const { handleEventCommands } = require('./eventCommands');
-const { handleResetCommand } = require('./resetCommands');
-const { checkRolePermission } = require('../utils/permissions');
+// commands/executeCommands.js
+
+const { handleDkpCommands }        = require('./dkpCommands');
+const { handleCurrencyCommands }   = require('./currencyCommands');
+const { handleEventCommands }      = require('./eventCommands');
+const { handleResetCommand }       = require('./resetCommands');
 const { handleHelpCommand, handleShowHelpCommand } = require('./helpCommands');
-const { handleConfigCommands } = require('./configCommands');
-const { handleReportCommand } = require('./reportCommands');
+const { handleConfigCommands }     = require('./configCommands');
+const { handleReportCommand }      = require('./reportCommands');
+const { handleReminderCommand }      = require('./reminderCommands');
+const { checkRolePermission }      = require('../utils/permissions');
+
+/**
+ * A wrapper to centralize error handling for all command handlers.
+ */
+async function safeInvoke(handler, interaction, name) {
+  try {
+    await handler(interaction);
+  } catch (error) {
+    console.error(`Error handling ${name} command:`, error);
+    // only reply if not already replied or deferred
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
+    }
+  }
+}
 
 const commandHandlers = {
-    config: async (interaction) => {
-        try {
-            const subcommand = interaction.options.getSubcommand();
-            const subcommandHandlers = {
-                dkp: handleConfigCommands,
-                channel: handleConfigCommands,
-                show: handleConfigCommands,
-                role: handleConfigCommands
-            };
+  // ─── Configuration ────────────────────────────────────────────────────────────
+  config:     async (i) => await safeInvoke(handleConfigCommands,  i, 'config'),
 
-            const handler = subcommandHandlers[subcommand];
-            if (handler) {
-                await handler(interaction);
-            } else {
-                await interaction.reply({ content: "This subcommand is not recognized.", ephemeral: true });
-            }
-        } catch (error) {
-            console.error('Error handling config command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    
-    // Administrators
-    dkpadd: async (interaction) => {
-        try {
-            await handleDkpCommands(interaction);
-        } catch (error) {
-            console.error('Error handling dkpadd command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    dkpremove: async (interaction) => {
-        try {
-            await handleDkpCommands(interaction);
-        } catch (error) {
-            console.error('Error handling dkpremove command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    reset: async (interaction) => {
-        try {
-            await handleResetCommand(interaction);
-        } catch (error) {
-            console.error('Error handling reset command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    config: async (interaction) => {
-        try {
-            await handleConfigCommands(interaction);
-        } catch (error) {
-            console.error('Error handling config command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    rankreport: async (interaction) => {
-        try {
-            await handleReportCommand(interaction);
-        } catch (error) {
-            console.error('Error handling rankreport command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    crow: async (interaction) => {
-        try {
-            await handleCrowCommands(interaction);
-        } catch (error) {
-            console.error('Error handling crow command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
+  // ─── DKP Management ───────────────────────────────────────────────────────────
+  dkp:        async (i) => await safeInvoke(handleDkpCommands,     i, 'dkp'),
+  rank:       async (i) => await safeInvoke(handleDkpCommands,     i, 'rank'),
+  dkpadd:     async (i) => await safeInvoke(handleDkpCommands,     i, 'dkpadd'),
+  dkpremove:  async (i) => await safeInvoke(handleDkpCommands,     i, 'dkpremove'),
 
-    // Moderators (can also use user commands)
-    event: async (interaction) => {
-        try {
-            await handleEventCommands(interaction);
-        } catch (error) {
-            console.error('Error handling event command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    showhelp: async (interaction) => {
-        try {
-            await handleShowHelpCommand(interaction);
-        } catch (error) {
-            console.error('Error handling showhelp command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
+  // ─── Currency / Bank ─────────────────────────────────────────────────────────
+  currency:   async (i) => await safeInvoke(handleCurrencyCommands, i, 'currency'),
+  bank:       async (i) => await safeInvoke(handleCurrencyCommands, i, 'bank'),
 
-    // Users (can be used by Moderators and Administrators)
-    dkp: async (interaction) => {
-        try {
-            await handleDkpCommands(interaction);
-        } catch (error) {
-            console.error('Error handling dkp command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    rank: async (interaction) => {
-        try {
-            await handleDkpCommands(interaction);
-        } catch (error) {
-            console.error('Error handling rank command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    bank: async (interaction) => {
-        try {
-            await handleCrowCommands(interaction);
-        } catch (error) {
-            console.error('Error handling bank command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    join: async (interaction) => {
-        try {
-            await handleEventCommands(interaction);
-        } catch (error) {
-            console.error('Error handling join command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    },
-    help: async (interaction) => {
-        try {
-            await handleHelpCommand(interaction);
-        } catch (error) {
-            console.error('Error handling help command:', error);
-            await interaction.reply({ content: "An error occurred while processing the command.", ephemeral: true });
-        }
-    }
+  // ─── Events ───────────────────────────────────────────────────────────────────
+  event:      async (i) => await safeInvoke(handleEventCommands,    i, 'event'),
+  join:       async (i) => await safeInvoke(handleEventCommands,    i, 'join'),
+
+  // ─── Reports & Resets ─────────────────────────────────────────────────────────
+  rankreport: async (i) => await safeInvoke(handleReportCommand,    i, 'rankreport'),
+  reset:      async (i) => await safeInvoke(handleResetCommand,     i, 'reset'),
+
+  // ─── Help ─────────────────────────────────────────────────────────────────────
+  help:       async (i) => await safeInvoke(handleHelpCommand,      i, 'help'),
+  showhelp:   async (i) => await safeInvoke(handleShowHelpCommand,  i, 'showhelp'),
+
+  // ─── Reminder ─────────────────────────────────────────────────────────────────
+  reminder:       async (i) => await safeInvoke(handleReminderCommand,      i, 'reminder'),
 };
 
 async function executeCommand(interaction) {
-    if (!await checkRolePermission(interaction, interaction.commandName)) {
-        return;
-    }
+  // Permission guard
+  if (!await checkRolePermission(interaction, interaction.commandName)) {
+    return;
+  }
 
-    const handler = commandHandlers[interaction.commandName];
+  const handler = commandHandlers[interaction.commandName];
+  if (!handler) {
+    return interaction.reply({ content: "This command is not recognized.", ephemeral: true });
+  }
 
-    if (handler) {
-        try {
-            await handler(interaction);
-        } catch (error) {
-            console.error(`Error executing command ${interaction.commandName}:`, error);
-            await interaction.reply({ content: "An error occurred while executing the command.", ephemeral: true });
-        }
-    } else {
-        await interaction.reply({ content: "This command is not recognized.", ephemeral: true });
-    }
+  // Dispatch
+  await handler(interaction);
 }
 
 module.exports = { executeCommand };

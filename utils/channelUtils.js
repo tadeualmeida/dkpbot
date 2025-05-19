@@ -1,33 +1,42 @@
-// channelUtils.js
+// utils/channelUtils.js
 
-const GuildConfig = require('../schema/GuildConfig');
+const { loadGuildConfig } = require('./config');
 const { createInfoEmbed } = require('./embeds');
 
-async function sendMessageToConfiguredChannels(interaction, description, messageType) {
-    const guildConfig = await GuildConfig.findOne({ guildId: interaction.guildId });
-    if (guildConfig && guildConfig.channels.length > 0) {
-        let embedTitle;
-        switch (messageType) {
-            case 'dkp':
-                embedTitle = 'DKP Info';
-                break;
-            case 'event':
-                embedTitle = 'Event Info';
-                break;
-            case 'crow':
-                embedTitle = 'Crow Info';
-                break;
-            default:
-                embedTitle = 'Info';
-        }
+/**
+ * Sends a single embed to the configured log channel for the given game.
+ * If no channel is configured, silently does nothing.
+ *
+ * @param {CommandInteraction} interaction
+ * @param {string} description      // já vem formatada com o executor e as linhas
+ * @param {'dkp'|'event'|'crow'|string} messageType
+ * @param {string} gameKey          // para buscar o canal correto
+ */
+async function sendMessageToConfiguredChannels(interaction, description, messageType, gameKey) {
+  // 1) carrega configuração atualizada
+  const cfg = await loadGuildConfig(interaction.guildId);
+  const game = cfg.games.find(g => g.key === gameKey);
+  if (!game) return;               // jogo não encontrado
+  const channelId = game.channels.log;
+  if (!channelId) return;          // sem canal log configurado
 
-        for (const channelId of guildConfig.channels) {
-            const channel = interaction.client.channels.cache.get(channelId);
-            if (channel) {
-                await channel.send({ embeds: [createInfoEmbed(embedTitle, description)] });
-            }
-        }
-    }
+  // 2) busca o canal
+  const channel = interaction.client.channels.cache.get(channelId);
+  if (!channel || !channel.send) return;
+
+  // 3) título do embed
+  let title;
+  switch (messageType) {
+    case 'dkp':   title = 'DKP Info';    break;
+    case 'event': title = 'Event Info';  break;
+    case 'crow':  title = 'Crow Info';   break;
+    default:      title = 'Info';
+  }
+
+  // 4) envia
+  await channel.send({
+    embeds: [ createInfoEmbed(title, description) ]
+  });
 }
 
 module.exports = { sendMessageToConfiguredChannels };

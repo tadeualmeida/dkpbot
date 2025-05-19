@@ -1,105 +1,157 @@
-// setupEventHandlers.js
+// events/setupEventHandlers.js
 
 const { handleInteractionCreate } = require('./interactionCreate');
-const { registerCommands } = require('../utils/registerCommands');
-const { handleMessageCreate } = require('./messageHandler');
-const { 
-    refreshDkpParametersCache, 
-    clearCache, 
-    refreshDkpPointsCache, 
-    refreshDkpMinimumCache, 
-    refreshCrowCache, 
-    refreshEventTimerCache,
-    refreshEligibleUsersCache,
-    refreshDkpRankingCache,
-    refreshRoleConfigCache,
-    refreshGuildConfigCache
+const { registerCommands }         = require('../utils/registerCommands');
+const { handleMessageCreate }      = require('./messageHandler');
+const {
+  getGamesFromCache,
+  refreshGuildConfigCache,
+  clearCache,
+  refreshDkpParametersCache,
+  refreshDkpPointsCache,
+  refreshDkpMinimumCache,
+  refreshCurrencyCache,
+  refreshEventTimerCache,
+  refreshEligibleUsersCache,
+  refreshDkpRankingCache,
+  refreshRoleConfigCache,
+  refreshActiveEventsCache
 } = require('../utils/cacheManagement');
-const { clearEmptyEvents } = require('../utils/clearEmptyEvents');
-const { 
-    checkForOrphanedGuilds, 
-    scheduleGuildDeletion, 
-    cancelScheduledGuildDeletion 
+const { clearEmptyEvents }         = require('../utils/clearEmptyEvents');
+const {
+  checkForOrphanedGuilds,
+  scheduleGuildDeletion,
+  cancelScheduledGuildDeletion
 } = require('../utils/guildManagement');
-const GuildConfig = require('../schema/GuildConfig');
+const GuildConfig                  = require('../schema/GuildConfig');
+const Reminder                     = require('../schema/Reminder');
+const { scheduleReminder }         = require('../utils/reminderScheduler');
 
+/**
+ * Recarrega todas as caches (por jogo) para uma guild
+ */
 async function refreshAllCaches(guildId) {
-    console.log(`Refreshing all caches for guild: ${guildId}`);
-    await Promise.all([
-        refreshDkpParametersCache(guildId), 
-        refreshDkpPointsCache(guildId), 
-        refreshDkpMinimumCache(guildId), 
-        refreshCrowCache(guildId), 
-        refreshEventTimerCache(guildId), 
-        refreshEligibleUsersCache(guildId),
-        refreshDkpRankingCache(guildId),
-        refreshRoleConfigCache(guildId),
-        refreshGuildConfigCache(guildId)
-    ]);
-    console.log(`All caches refreshed for guild: ${guildId}`);
+  console.log(`Refreshing all caches for guild: ${guildId}`);
+  await refreshGuildConfigCache(guildId);
+
+  const games = await getGamesFromCache(guildId);
+  await Promise.all(
+    games.map(g => {
+      const key = g.key;
+      return Promise.all([
+        refreshDkpParametersCache(guildId, key),
+        refreshDkpPointsCache(guildId, key),
+        refreshDkpMinimumCache(guildId, key),
+        refreshCurrencyCache(guildId, key),
+        refreshEventTimerCache(guildId, key),
+        refreshEligibleUsersCache(guildId, key),
+        refreshDkpRankingCache(guildId, key),
+        refreshRoleConfigCache(guildId, key),
+        refreshActiveEventsCache(guildId, key),
+      ]);
+    })
+  );
+  console.log(`All caches refreshed for guild: ${guildId}`);
 }
 
+/**
+ * Garante que exista um documento GuildConfig
+ */
 async function ensureGuildConfigExists(guildId) {
-    const existingConfig = await GuildConfig.findOne({ guildId });
-    if (!existingConfig) {
-        const newGuildConfig = new GuildConfig({
-            guildId,
-            guildName: 'GuildName',
-            eventTimer: 10,
-            minimumPoints: 0,
-            dkpParameters: [],
-            roles: [],
-            channels: [],
-            totalDkp: 0,
-            crows: 0
-        });
-        await newGuildConfig.save();
-        console.log(`Created new GuildConfig for guild: ${guildId}`);
-    }
+  const existing = await GuildConfig.findOne({ guildId });
+  if (!existing) {
+    const newCfg = new GuildConfig({ guildId, guildName: 'GuildName' });
+    await newCfg.save();
+    console.log(`Created new GuildConfig for guild: ${guildId}`);
+  }
 }
 
+/**
+ * Reagenda todos os reminders persistidos no Mongo,
+ * removendo imediatamente os que já expiraram.
+ *
+ * @param {import('discord.js').Client} client — instância do Discord.Client
+ */
+async function bootstrapReminders(client) {
+  const now = new Date();
+
+  // Busca **todos** os reminders
+  const all = await Reminder.find({}).lean();
+
+  for (const rem of all) {
+    // Se já expirou, remove do banco
+    if (rem.targetTimestamp <= now) {
+      await Reminder.deleteOne({ _id: rem._id });
+      console.log(`[REMINDER] Expired reminder ${rem._id} removed from DB`);
+      continue;
+    }
+
+    // Senão, reagenda
+    try {
+      scheduleReminder(
+        rem.guildId,
+        rem.gameKey,
+        rem.parameterName,
+        rem.intervals,
+        rem.targetTimestamp,
+        { client, guildId: rem.guildId }
+      );
+      console.log(`[REMINDER] Bootstrapped reminder ${rem._id} for parameter "${rem.parameterName}"`);
+    } catch (err) {
+      console.error(`[REMINDER] Failed to bootstrap reminder ${rem._id}:`, err);
+    }
+  }
+}
+
+/**
+ * Configura todos os event handlers do Discord.js
+ */
 function setupEventHandlers(client) {
-    client.on('ready', async () => {
-        console.log(`Logged in as ${client.user.tag}!`);
-        clearEmptyEvents();
+  client.on('ready', async () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+    clearEmptyEvents();
 
-        for (const guild of client.guilds.cache.values()) {
-            clearCache(guild.id);
-            try {
-                await ensureGuildConfigExists(guild.id);
-                await refreshAllCaches(guild.id);
-                await registerCommands(guild.id);
-                console.log(`Todos os caches foram atualizados corretamente para a guilda ${guild.id}`);
-            } catch (error) {
-                console.error(`Erro ao atualizar os caches para a guilda ${guild.id}:`, error);
-            }
-        }
+    // Inicialização por guild
+    for (const g of client.guilds.cache.values()) {
+      clearCache(g.id);
+      try {
+        await ensureGuildConfigExists(g.id);
+        await refreshAllCaches(g.id);
+        await registerCommands(g.id);
+        console.log(`Caches updated for guild ${g.id}`);
+      } catch (err) {
+        console.error(`Error initializing guild ${g.id}:`, err);
+      }
+    }
 
-        await checkForOrphanedGuilds(client);
-    });
+    // Reagendar reminders persistidos
+    await bootstrapReminders(client);
 
-    client.on('guildCreate', async guild => {
-        console.log(`Joined new guild: ${guild.id}`);
-        cancelScheduledGuildDeletion(guild.id);
-        clearCache(guild.id);
+    // Verifica guilds órfãos
+    await checkForOrphanedGuilds(client);
+  });
 
-        try {
-            await ensureGuildConfigExists(guild.id);
-            await refreshAllCaches(guild.id);
-            await registerCommands(guild.id);
-            console.log(`Todos os caches foram atualizados corretamente para a nova guilda ${guild.id}`);
-        } catch (error) {
-            console.error(`Erro ao atualizar os caches para a nova guilda ${guild.id}:`, error);
-        }
-    });
+  client.on('guildCreate', async guild => {
+    console.log(`Joined new guild: ${guild.id}`);
+    cancelScheduledGuildDeletion(guild.id);
+    clearCache(guild.id);
+    try {
+      await ensureGuildConfigExists(guild.id);
+      await refreshAllCaches(guild.id);
+      await registerCommands(guild.id);
+      console.log(`Caches updated for new guild ${guild.id}`);
+    } catch (err) {
+      console.error(`Error updating caches for new guild ${guild.id}:`, err);
+    }
+  });
 
-    client.on('guildDelete', async guild => {
-        console.log(`Left guild: ${guild.id}`);
-        await scheduleGuildDeletion(guild.id);
-    });
+  client.on('guildDelete', async guild => {
+    console.log(`Left guild: ${guild.id}`);
+    await scheduleGuildDeletion(guild.id);
+  });
 
-    client.on('interactionCreate', handleInteractionCreate);
-    client.on('messageCreate', handleMessageCreate);
+  client.on('interactionCreate', handleInteractionCreate);
+  client.on('messageCreate', handleMessageCreate);
 }
 
 module.exports = setupEventHandlers;

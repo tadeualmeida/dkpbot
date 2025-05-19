@@ -1,46 +1,58 @@
+// commands/reportCommands.js
 const ExcelJS = require('exceljs');
 const Dkp = require('../schema/Dkp');
 const { AttachmentBuilder } = require('discord.js');
+const { resolveGameKey } = require('../utils/resolveGameKey');
 
-async function generateRankReport(guild) {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('DKP Rank');
+async function generateRankReport(guild, gameKey) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('DKP Rank');
 
-    worksheet.columns = [
-        { header: 'Rank', key: 'rank', width: 10 },
-        { header: 'User', key: 'username', width: 30 },
-        { header: 'Points', key: 'points', width: 10 },
-    ];
+  worksheet.columns = [
+    { header: 'Rank', key: 'rank', width: 10 },
+    { header: 'User', key: 'username', width: 30 },
+    { header: 'Points', key: 'points', width: 10 },
+  ];
 
-    const dkpPoints = await Dkp.find({ guildId: guild.id }).sort({ points: -1 }).exec();
+  // Query by guildId + gameKey
+  const query = { guildId: guild.id };
+  if (gameKey) query.gameKey = gameKey;
 
-    for (let i = 0; i < dkpPoints.length; i++) {
-        const dkp = dkpPoints[i];
-        const member = await guild.members.fetch(dkp.userId).catch(() => null);
-        const username = member ? member.displayName : 'Unknown User';  // Use member.displayName para o nome na guilda
+  const dkpPoints = await Dkp.find(query).sort({ points: -1 }).exec();
 
-        worksheet.addRow({
-            rank: i + 1,
-            username: username,
-            points: dkp.points,
-        });
-    }
+  for (let i = 0; i < dkpPoints.length; i++) {
+    const dkp = dkpPoints[i];
+    const member = await guild.members.fetch(dkp.userId).catch(() => null);
+    const username = member ? member.displayName : `<@${dkp.userId}>`;
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    return buffer;
+    worksheet.addRow({
+      rank: i + 1,
+      username,
+      points: dkp.points,
+    });
+  }
+
+  return workbook.xlsx.writeBuffer();
 }
 
 async function handleReportCommand(interaction) {
-    const guild = interaction.guild;
-    try {
-        await interaction.deferReply({ ephemeral: true });
-        const buffer = await generateRankReport(guild);
-        const attachment = new AttachmentBuilder(buffer, { name: 'DKP_Rank_Report.xlsx' });
-        await interaction.followUp({ files: [attachment], ephemeral: true });
-    } catch (error) {
-        console.error('Error generating rank report:', error);
-        await interaction.followUp({ content: 'There was an error generating the rank report.', ephemeral: true });
-    }
+  try {
+    await interaction.deferReply({ ephemeral: true });
+    // Resolve gameKey via option or roles
+    const forced = interaction.options.getString('game');
+    const gameKey = forced ? forced.toLowerCase() : await resolveGameKey(interaction, interaction.member);
+
+    const buffer = await generateRankReport(interaction.guild, gameKey);
+    const fileName = gameKey
+      ? `DKP_Rank_Report_${gameKey}.xlsx`
+      : 'DKP_Rank_Report_AllGames.xlsx';
+
+    const attachment = new AttachmentBuilder(buffer, { name: fileName });
+    await interaction.followUp({ files: [attachment], ephemeral: true });
+  } catch (error) {
+    console.error('Error generating rank report:', error);
+    await interaction.followUp({ content: 'There was an error generating the rank report.', ephemeral: true });
+  }
 }
 
 module.exports = { handleReportCommand };

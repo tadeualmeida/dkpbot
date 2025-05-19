@@ -1,83 +1,114 @@
+// commands/resetCommands.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const Event = require('../schema/Event');
-const Dkp = require('../schema/Dkp');
-const { 
-    refreshDkpParametersCache, clearCache, refreshDkpPointsCache, 
-    refreshDkpMinimumCache, refreshCrowCache, refreshEventTimerCache, 
-    refreshEligibleUsersCache, refreshDkpRankingCache 
+const Event    = require('../schema/Event');
+const Dkp      = require('../schema/Dkp');
+const Reminder = require('../schema/Reminder');
+const GuildConfig = require('../schema/GuildConfig');
+const {
+  refreshDkpParametersCache,
+  clearCache,
+  refreshDkpPointsCache,
+  refreshDkpMinimumCache,
+  refreshCurrencyCache,
+  refreshEventTimerCache,
+  refreshEligibleUsersCache,
+  refreshDkpRankingCache
 } = require('../utils/cacheManagement');
 const { createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
-const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
-const { replyWithError } = require('../utils/generalUtils');
-const GuildConfig = require('../schema/GuildConfig');
+const { sendMessageToConfiguredChannels }   = require('../utils/channelUtils');
+const { loadGuildConfig }                  = require('../utils/config');
 
 async function handleResetCommand(interaction) {
-    const guildId = interaction.guildId;
-    const userName = interaction.member ? interaction.member.displayName : interaction.user.username;
+  const guildId = interaction.guildId;
+  const gameKey = interaction.options.getString('game')?.toLowerCase();
+  const cfg     = await loadGuildConfig(guildId);
+  const game    = cfg.games.find(g => g.key === gameKey);
 
-    const confirmButton = new ButtonBuilder()
-        .setCustomId('confirm_reset')
-        .setLabel('Confirm')
-        .setStyle(ButtonStyle.Danger);
-
-    const cancelButton = new ButtonBuilder()
-        .setCustomId('cancel_reset')
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    const embed = createErrorEmbed(
-        'Reset Info',
-        '**Are you sure you want to reset all DKP points, events, and crows? This action is irreversible.**'
-    );
-
-    await interaction.reply({
-        embeds: [embed],
-        components: [row],
-        ephemeral: true
+  if (!game) {
+    return interaction.reply({
+      embeds: [ createErrorEmbed('Unknown Game', `No config found for game **${gameKey}**.`) ],
+      ephemeral: true
     });
+  }
 
-    const filter = i => i.user.id === interaction.user.id;
-    const collector = interaction.channel.createMessageComponentCollector({ filter, time: 30000 });
+  const confirmBtn = new ButtonBuilder()
+    .setCustomId('confirm_reset')
+    .setLabel(`Reset ${game.name}`)
+    .setStyle(ButtonStyle.Danger);
+  const cancelBtn = new ButtonBuilder()
+    .setCustomId('cancel_reset')
+    .setLabel('Cancel')
+    .setStyle(ButtonStyle.Secondary);
 
-    collector.on('collect', async i => {
-        if (i.customId === 'confirm_reset') {
-            await resetGuildData(guildId);
-            const resetCompleteEmbed = createInfoEmbed('Reset Complete', `All DKP points, events, and crows have been reset for this guild`);
-            await sendMessageToConfiguredChannels(interaction, `All DKP points, events, and crows have been reset for this guild by **${userName}**.`, 'dkp');
-            await i.update({ embeds: [resetCompleteEmbed], components: [], ephemeral: true });
-        } else if (i.customId === 'cancel_reset') {
-            const resetCancelledEmbed = createInfoEmbed('Reset Cancelled', 'The reset operation has been cancelled.');
-            await i.update({ embeds: [resetCancelledEmbed], components: [], ephemeral: true });
-        }
-    });
+  await interaction.reply({
+    embeds: [ createErrorEmbed(
+      'Please confirm reset',
+      `This will clear **all** DKP, events, reminders & currency for **${game.name}**.`
+    ) ],
+    components: [ new ActionRowBuilder().addComponents(confirmBtn, cancelBtn) ],
+    ephemeral: true
+  });
 
-    collector.on('end', collected => {
-        if (collected.size === 0) {
-            const timeoutEmbed = createInfoEmbed('Reset Timeout', 'Reset timed out. No action taken.');
-            interaction.editReply({ embeds: [timeoutEmbed], components: [], ephemeral: true });
-        }
-    });
+  const filter = i => i.user.id === interaction.user.id;
+  const collector = interaction.channel.createMessageComponentCollector({ filter, time: 30000 });
+
+  collector.on('collect', async i => {
+    if (i.customId === 'confirm_reset') {
+      await resetGameData(guildId, gameKey);
+      const done = createInfoEmbed('Reset Complete',
+        `All DKP, events, reminders, and currency for **${game.name}** have been reset.`);
+      // log to the game’s DKP channel
+      await sendMessageToConfiguredChannels(
+        interaction,
+        `🗑️ Reset performed on **${game.name}** by **${interaction.member.displayName}**`,
+        'dkp',
+        gameKey
+      );
+      await i.update({ embeds: [done], components: [], ephemeral: true });
+    } else {
+      const cancelled = createInfoEmbed('Reset Cancelled', 'No changes made.');
+      await i.update({ embeds: [cancelled], components: [], ephemeral: true });
+    }
+  });
+
+  collector.on('end', collected => {
+    if (collected.size === 0) {
+      const timeout = createInfoEmbed('Reset Timeout', 'No action taken.');
+      interaction.editReply({ embeds: [timeout], components: [], ephemeral: true });
+    }
+  });
 }
 
-async function resetGuildData(guildId) {
-    const resetOperations = [
-        Dkp.deleteMany({ guildId }).exec(),
-        Event.deleteMany({ guildId }).exec(),
-        GuildConfig.updateOne({ guildId }, { $set: { crows: 0, totalDkp: 0 } }, { upsert: true }).exec()
-    ];
+async function resetGameData(guildId, gameKey) {
+  // 1) Remove only that game's docs
+  await Promise.all([
+    Dkp.deleteMany({ guildId, gameKey }),
+    Event.deleteMany({ guildId, gameKey }),
+    Reminder.deleteMany({ guildId, gameKey })
+  ]);
 
-    await Promise.all(resetOperations);
+  // 2) Zero out that game’s currency & totalDkp
+  const cfg = await GuildConfig.findOne({ guildId });
+  if (cfg) {
+    const g = cfg.games.find(x => x.key === gameKey);
+    if (g) {
+      g.currency.total = 0;
+      g.totalDkp       = 0;
+      await cfg.save();
+    }
+  }
 
-    clearCache(guildId);
-    await refreshDkpParametersCache(guildId);
-    await refreshDkpPointsCache(guildId);
-    await refreshDkpMinimumCache(guildId);
-    await refreshCrowCache(guildId);
-    await refreshEventTimerCache(guildId);
-    await refreshEligibleUsersCache(guildId);
-    await refreshDkpRankingCache(guildId);
+  // 3) Clear caches just for that game
+  clearCache(guildId);
+  await Promise.all([
+    refreshDkpParametersCache(guildId, gameKey),
+    refreshDkpPointsCache(guildId, gameKey),
+    refreshDkpMinimumCache(guildId, gameKey),
+    refreshCurrencyCache(guildId, gameKey),
+    refreshEventTimerCache(guildId, gameKey),
+    refreshEligibleUsersCache(guildId, gameKey),
+    refreshDkpRankingCache(guildId, gameKey)
+  ]);
 }
 
 module.exports = { handleResetCommand };

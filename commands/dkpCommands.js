@@ -1,246 +1,286 @@
-// dkpCommands.js
+// commands/dkpCommands.js
 
-const { 
-    getGuildCache, 
-    getDkpPointsFromCache, 
-    refreshDkpPointsCache, 
-    getDkpMinimumFromCache, 
-    getCrowsFromCache, 
-    refreshEligibleUsersCache, 
-    getEligibleUsersFromCache, 
-    refreshDkpRankingCache, 
-    getDkpRankingFromCache 
+const {
+  getDkpPointsFromCache,
+  refreshDkpPointsCache,
+  getDkpMinimumFromCache,
+  refreshDkpMinimumCache,
+  getCurrencyFromCache,
+  refreshCurrencyCache,
+  refreshEligibleUsersCache,
+  getEligibleUsersFromCache,
+  refreshDkpRankingCache,
+  getDkpRankingFromCache,
+  getGamesFromCache
 } = require('../utils/cacheManagement');
-const { createMultipleResultsEmbed, createInfoEmbed } = require('../utils/embeds');
-const Dkp = require('../schema/Dkp');
+
+const {
+  createMultipleResultsEmbed,
+  createInfoEmbed
+} = require('../utils/embeds');
+
+const {
+  fetchUserToModify,
+  getUserDkpChanges,
+  createBulkOperations,
+  replyWithError,
+  updateDkpTotal
+} = require('../utils/generalUtils');
+
+const { resolveGameKey } = require('../utils/resolveGameKey');
 const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
-const validator = require('validator');
-const { fetchUserToModify, getUserDkpChanges, createBulkOperations, replyWithError, updateDkpTotal } = require('../utils/generalUtils');
 const { sendUserNotification } = require('../events/messageHandler');
 
+const Dkp = require('../schema/Dkp');
+
+/**
+ * Entrypoint for all DKP slash commands:
+ * delegates to the specific handler based on commandName
+ */
 async function handleDkpCommands(interaction) {
-    const guildId = interaction.guildId;
-    const userId = interaction.user.id;
-
-    try {
-        switch (interaction.commandName) {
-            case 'dkp':
-                await handleDkpBalance(interaction, guildId, userId);
-                break;
-            case 'dkpadd':
-            case 'dkpremove':
-                await handleDkpAddRemove(interaction, guildId, interaction.commandName === 'dkpadd');
-                break;
-            case 'rank':
-                await handleDkpRank(interaction, guildId);
-                break;
-            default:
-                await replyWithError(interaction, 'Error', 'Invalid DKP command.');
-                break;
-        }
-    } catch (error) {
-        console.error('Error handling DKP command:', error);
-        await replyWithError(interaction, 'Error', 'An error occurred while processing the DKP command.');
-    }
+  switch (interaction.commandName) {
+    case 'dkp':
+      return handleDkpBalance(interaction, interaction.guildId, interaction.user.id);
+    case 'rank':
+      return handleDkpRank(interaction, interaction.guildId, interaction.member);
+    case 'dkpadd':
+      return handleDkpAddRemove(interaction, interaction.guildId, true, interaction.member);
+    case 'dkpremove':
+      return handleDkpAddRemove(interaction, interaction.guildId, false, interaction.member);
+    default:
+      return replyWithError(interaction, 'Error', 'Invalid DKP command.');
+  }
 }
 
+/**
+ * /dkp — show either all balances or a single-game balance
+ */
 async function handleDkpBalance(interaction, guildId, userId) {
-    try {
-        // Adicionando deferReply para garantir que o bot tenha mais tempo para processar a resposta
-        await interaction.deferReply({ ephemeral: true });
+  const explicit = interaction.options.getString('game')?.toLowerCase();
+  const gamesArr = await getGamesFromCache(guildId);
 
-        // Pegando os dados do cache
-        const [userDkp, minimumDkp, crows, eligibleUsers] = await Promise.all([
-            getDkpPointsFromCache(guildId, userId),
-            getDkpMinimumFromCache(guildId),
-            getCrowsFromCache(guildId),
-            getEligibleUsersFromCache(guildId)
-        ]);
+  // find games where member has the "user" role
+const playable = gamesArr.filter(g =>
+  g.roles.user.some(roleId =>
+    interaction.member.roles.cache.has(roleId)
+  )
+);
 
-        // Calculando valores necessários
-        const eligibleDkp = eligibleUsers.reduce((sum, user) => sum + user.points, 0);
-        const crowsPerDkp = eligibleDkp > 0 ? (crows / eligibleDkp).toFixed(2) : '0';
+  // explicit request → single
+  if (explicit) {
+    return showSingleBalance(interaction, guildId, userId, explicit);
+  }
 
-        // Criando a descrição da resposta
-        const description = getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp);
-        
-        // Respondendo à interação
-        await interaction.editReply({
-            embeds: [createInfoEmbed('DKP Balance', description)],
-            ephemeral: true
-        });
-    } catch (error) {
-        console.error('Error fetching DKP balance:', error);
+  // exactly one → single
+  if (playable.length === 1) {
+    return showSingleBalance(interaction, guildId, userId, playable[0].key);
+  }
 
-        // Certifique-se de responder a qualquer erro corretamente
-        if (interaction.replied || interaction.deferred) {
-            await interaction.editReply({
-                content: 'Failed to retrieve DKP balance due to an error.',
-                ephemeral: true
-            });
-        } else {
-            await interaction.reply({
-                content: 'Failed to retrieve DKP balance due to an error.',
-                ephemeral: true
-            });
-        }
+  // none → error
+  if (!playable.length) {
+    return interaction.reply({ content: `You don't have access to any game.`, ephemeral: true });
+  }
+
+  // multiple → list all
+  await interaction.deferReply({ ephemeral: true });
+
+  // refresh caches
+  await Promise.all(playable.map(g =>
+    Promise.all([
+      refreshDkpPointsCache(guildId, g.key),
+      refreshEligibleUsersCache(guildId, g.key),
+      refreshCurrencyCache(guildId, g.key),
+      refreshDkpMinimumCache(guildId, g.key),
+    ])
+  ));
+
+  const lines = await Promise.all(playable.map(async g => {
+    const [dkpRec, min, bank] = await Promise.all([
+      getDkpPointsFromCache(guildId, g.key, userId),
+      getDkpMinimumFromCache(guildId, g.key),
+      getCurrencyFromCache(guildId, g.key)
+    ]);
+
+    const pts    = dkpRec?.points ?? 0;
+    const needed = min - pts;
+    const curr   = g.currency.name;
+    const name   = g.name;
+
+    if (min === 0 || pts >= min) {
+      return `**${name}**: **${pts}** DKP — Bank: **${bank}** ${curr}`;
+    } else {
+      return `**${name}**: **${pts}** DKP (below min **${min}**, need **${needed}** more)`;
     }
+  }));
+
+  return interaction.editReply({
+    embeds: [ createMultipleResultsEmbed('info', 'Your DKP Balances', lines) ]
+  });
 }
 
-function getDescriptionForDkpBalance(minimumDkp, userDkp, crows, crowsPerDkp) {
-    const points = userDkp ? userDkp.points : 0;
-    const userCrows = (points * crowsPerDkp).toFixed(2);
-    const pointsNeeded = minimumDkp - points;
+/**
+ * Helper to show a single‐game balance
+ */
+async function showSingleBalance(interaction, guildId, userId, gameKey) {
+  await interaction.deferReply({ ephemeral: true });
 
-    return minimumDkp === 0 || points >= minimumDkp ?
-        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nEstimated crows per DKP: **${crowsPerDkp}** crows\n\nCrows you are currently earning: **${userCrows}**` :
-        `You have **${points}** DKP.\n\nThe guild bank has **${crows}** crows.\n\nYou are currently earning **0** crows because your DKP is below the minimum required.\n\n**Note:** The minimum DKP to earn crows is **${minimumDkp}** DKP. You need **${pointsNeeded}** more points to start earning crows.`;
+  await Promise.all([
+    refreshDkpPointsCache(guildId, gameKey),
+    refreshEligibleUsersCache(guildId, gameKey),
+    refreshCurrencyCache(guildId, gameKey),
+    refreshDkpMinimumCache(guildId, gameKey),
+  ]);
+
+  const [dkpRec, min, bank] = await Promise.all([
+    getDkpPointsFromCache(guildId, gameKey, userId),
+    getDkpMinimumFromCache(guildId, gameKey),
+    getCurrencyFromCache(guildId, gameKey),
+  ]);
+
+  const pts         = dkpRec?.points ?? 0;
+  const needed      = min - pts;
+  const cfg         = (await getGamesFromCache(guildId)).find(g => g.key === gameKey) || {};
+  const displayName = cfg.name   || gameKey;
+  const currName    = cfg.currency?.name || 'Currency';
+
+  const desc = (min === 0 || pts >= min)
+    ? `You have **${pts}** DKP in **${displayName}**.\nBank: **${bank}** ${currName}.`
+    : `You have **${pts}** DKP in **${displayName}**, below minimum **${min}**, need **${needed}** more.`;
+
+  return interaction.editReply({
+    embeds: [ createInfoEmbed(`DKP — ${displayName}`, desc) ]
+  });
 }
 
-async function handleDkpAddRemove(interaction, guildId, isAdd) {
-    await interaction.deferReply({ ephemeral: true });
+/**
+ * /rank — per‐game only, resolves via roles or explicit option
+ */
+async function handleDkpRank(interaction, guildId, member, forcedGameKey) {
+  // step 1: determine gameKey
+  let gameKey = forcedGameKey
+    || interaction.options.getString('game')?.toLowerCase()
+    || null;
 
-    const pointsToModify = interaction.options.getInteger('points');
-    const userIDsInput = interaction.options.getString('users');
-    const descriptionInput = interaction.options.getString('description');
-    const executingUser = validator.escape(interaction.user.username);
+  if (!gameKey) {
+    gameKey = await resolveGameKey(interaction, member);
+    if (!gameKey) return; // user was prompted or errored
+  }
 
-    if (!userIDsInput) {
-        await interaction.editReply({
-            content: "You must specify at least one user ID.",
-            ephemeral: true
-        });
-        return;
-    }
+  // step 2: fetch & show ranking
+  await interaction.deferReply({ ephemeral: true });
+  await refreshDkpRankingCache(guildId, gameKey);
 
-    const userIDs = [...new Set(userIDsInput.split(/[\s,]+/).filter(id => id))];
-    const descriptions = await modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, isAdd, descriptionInput, executingUser);
-
-    await interaction.editReply({
-        embeds: [createMultipleResultsEmbed('info', 'DKP Modification Results', descriptions)],
-        ephemeral: true
+  const ranking = await getDkpRankingFromCache(guildId, gameKey);
+  if (!ranking.length) {
+    return interaction.editReply({
+      embeds: [ createInfoEmbed('No DKP Ranking', 'No ranking available for this game.') ]
     });
+  }
 
-    const actionText = isAdd ? 'added points to' : 'removed points from';
-    const executorName = interaction.member ? interaction.member.displayName : executingUser;
-    const notification = descriptions.join('\n');
-    await sendMessageToConfiguredChannels(interaction, `**${executorName}** ${actionText} the following users:\n${notification}`, 'dkp');
+  const userIds = ranking.map(r => r.userId);
+  const members = await interaction.guild.members.fetch({ user: userIds });
+  const nameMap = new Map(members.map(m => [m.user.id, m.displayName]));
+
+  const cfg         = (await getGamesFromCache(guildId)).find(g => g.key === gameKey) || {};
+  const displayName = cfg.name || gameKey;
+
+  const lines = ranking.map((r, idx) => {
+    const uname = nameMap.get(r.userId) || `<@${r.userId}>`;
+    return `${idx + 1}. **${uname}** — ${r.points} points`;
+  });
+
+  return interaction.editReply({
+    embeds: [ createMultipleResultsEmbed('info', `DKP Ranking — ${displayName}`, lines) ]
+  });
 }
 
-async function modifyDkpPoints(interaction, userIDs, guildId, pointsToModify, isAdd, descriptionInput, executingUser) {
-    const descriptions = [];
-    const participants = [];
-    const userIdSet = new Set();
-    let totalPointsModified = 0;
+/**
+ * /dkpadd & /dkpremove — per‐game only, requires explicit game option
+ */
+async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
+  const rawGame = interaction.options.getString('game');
+  if (!rawGame) {
+    return replyWithError(interaction, 'Error', 'A game key is required.');
+  }
+  const gameKey = rawGame.toLowerCase();
 
-    for (let userID of userIDs) {
-        userID = userID.trim().replace(/<@|>/g, '');
-        try {
-            const userToModify = await fetchUserToModify(userID, interaction);
-            if (!userToModify) {
-                descriptions.push(`User ID ${userID} not found.`);
-                continue;
-            }
-            if (userIdSet.has(userID)) {
-                descriptions.push(`User ${userToModify.displayName} was mentioned multiple times. Ignoring duplicates.`);
-                continue;
-            }
-            userIdSet.add(userID);
+  await interaction.deferReply({ ephemeral: true });
 
-            const { pointChange, userDkp } = await getUserDkpChanges(guildId, userID, pointsToModify, isAdd, Dkp, getDkpPointsFromCache, getGuildCache);
-            const transactionDescription = `${executingUser} ${isAdd ? 'added' : 'removed'} points${descriptionInput ? `: ${descriptionInput}` : ''}`;
+  const pointsToModify   = interaction.options.getInteger('points');
+  const userIDsInput     = interaction.options.getString('users');
+  const descriptionInput = interaction.options.getString('description') || '';
 
-            participants.push({
-                userId: userID,
-                username: userToModify.displayName,
-                pointChange,
-                transactionDescription
-            });
-            totalPointsModified += pointChange;
-            descriptions.push(`${pointChange > 0 ? 'Added' : 'Removed'} **${Math.abs(pointChange)}** points to **${userToModify.displayName}**. Now have **${userDkp.points}** points.`);
+  if (!userIDsInput) {
+    return interaction.editReply({ content: 'You must specify at least one user ID.', ephemeral: true });
+  }
 
-            await sendUserNotification(userToModify, pointChange, userDkp.points, descriptionInput);
-        } catch (error) {
-            console.error(`Failed to modify points for user ID ${userID} due to an error:`, error);
-            descriptions.push(`Failed to modify points for user ID ${userID} due to an error.`);
-        }
-    }
+  // parse and dedupe user IDs
+  const userIDs = Array.from(new Set(
+    userIDsInput.split(/[,\s]+/).map(s => s.replace(/<@!?(\d+)>/, '$1'))
+  ));
 
-    if (participants.length > 0) {
-        const bulkOperations = createBulkOperations(participants, guildId, isAdd ? pointsToModify : -pointsToModify, descriptionInput || '');
-        await Dkp.bulkWrite(bulkOperations);
-        await updateDkpTotal(totalPointsModified, guildId);
-        await Promise.all([
-            refreshDkpPointsCache(guildId),
-            refreshEligibleUsersCache(guildId),
-            refreshDkpRankingCache(guildId)
-        ]);
-    }
+  const participants = [];
+  let totalPts = 0;
 
-    if (descriptionInput) {
-        descriptions.push(`\nReason: **${descriptionInput}**`);
-    }
+  for (const userId of userIDs) {
+    const userToModify = await fetchUserToModify(userId, interaction);
+    if (!userToModify) continue;
 
-    return descriptions;
+    const { pointChange, userDkp } = await getUserDkpChanges(
+      guildId, gameKey, userId, pointsToModify, isAdd, Dkp,
+      getDkpPointsFromCache,
+      () => {} // no secondary cache write here
+    );
+
+    participants.push({ userId, pointChange });
+    totalPts += pointChange;
+
+    await sendUserNotification(userToModify, pointChange, userDkp.points, descriptionInput);
+  }
+
+  if (participants.length) {
+    const bulkOps = createBulkOperations(
+      participants,
+      guildId,
+      gameKey,
+      isAdd ? pointsToModify : -pointsToModify,
+      descriptionInput
+    );
+    await Dkp.bulkWrite(bulkOps);
+    await updateDkpTotal(totalPts, guildId, gameKey);
+
+    await Promise.all([
+      refreshDkpPointsCache(guildId, gameKey),
+      refreshEligibleUsersCache(guildId, gameKey),
+      refreshDkpRankingCache(guildId, gameKey),
+    ]);
+
+    // build and send log once
+    const actor = interaction.member.displayName || interaction.user.username;
+    const actionLines = participants.map(p =>
+      p.pointChange > 0
+        ? `Added **${p.pointChange}** DKP to <@${p.userId}>`
+        : `Removed **${Math.abs(p.pointChange)}** DKP from <@${p.userId}>`
+    );
+    const logDesc = `**${actor}**\n${actionLines.join('\n')}`;
+
+    await sendMessageToConfiguredChannels(interaction, logDesc, 'dkp', gameKey);
+  }
+
+  // final reply
+  const results = participants.map(p =>
+    p.pointChange > 0
+      ? `Added **${p.pointChange}** DKP to <@${p.userId}>`
+      : `Removed **${Math.abs(p.pointChange)}** DKP from <@${p.userId}>`
+  );
+  return interaction.editReply({
+    embeds: [ createMultipleResultsEmbed('info', 'DKP Modification Results', results) ]
+  });
 }
 
-async function handleDkpRank(interaction, guildId) {
-    try {
-        await interaction.deferReply({
-            ephemeral: true
-        });
-
-        const dkpRanking = await getDkpRankingFromCache(guildId);
-
-        if (dkpRanking.length === 0) {
-            await interaction.editReply({
-                embeds: [createInfoEmbed('No DKP Ranking', 'There is currently no DKP ranking available.')],
-                ephemeral: true
-            });
-            return;
-        }
-
-        const descriptions = await getDkpRankDescriptions(dkpRanking, interaction);
-        const embeds = createRankEmbeds(descriptions);
-
-        await interaction.editReply({
-            embeds
-        });
-    } catch (error) {
-        console.error('Failed to retrieve DKP rankings:', error);
-        await interaction.editReply({
-            content: 'Failed to retrieve DKP rankings due to an error.'
-        });
-    }
-}
-
-async function getDkpRankDescriptions(dkpRanking, interaction) {
-    const userIds = dkpRanking.map(dkp => dkp.userId);
-    const members = await interaction.guild.members.fetch({
-        user: userIds
-    });
-
-    const userIdToNameMap = new Map();
-    members.forEach(member => {
-        userIdToNameMap.set(member.user.id, member.displayName);
-    });
-
-    return dkpRanking.map((dkp, index) => {
-        const userName = userIdToNameMap.get(dkp.userId) || `<@${dkp.userId}> (Name fetch failed)`;
-        return `${index + 1}. **${userName}** - ${dkp.points} points`;
-    });
-}
-
-function createRankEmbeds(descriptions) {
-    const embeds = [];
-    const chunkSize = 50;
-
-    for (let i = 0; i < descriptions.length; i += chunkSize) {
-        const chunk = descriptions.slice(i, i + chunkSize);
-        embeds.push(createMultipleResultsEmbed('info', `DKP Ranking - ${i + 1} to ${i + chunk.length}`, chunk));
-    }
-
-    return embeds;
-}
-
-module.exports = { handleDkpCommands };
+module.exports = {
+  handleDkpCommands,
+  handleDkpBalance,
+  handleDkpRank,
+  handleDkpAddRemove
+};

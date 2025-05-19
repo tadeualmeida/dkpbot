@@ -1,43 +1,86 @@
-// dkpSlash.js
-
+// slashcommands/dkpSlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
+// Balance (optional game)
 const dkpCommand = new SlashCommandBuilder()
   .setName('dkp')
-  .setDescription('Check your DKP balance.');
+  .setDescription('Check your DKP balance.')
+  .addStringOption(opt =>
+    opt
+      .setName('game')
+      .setDescription('Select the game to check DKP for (optional)')
+      .setRequired(false)
+      .setAutocomplete(true)
+  );
 
+// Rank (optional game)
 const rankCommand = new SlashCommandBuilder()
   .setName('rank')
-  .setDescription('Check DKP rank.');
+  .setDescription('Check DKP rank.')
+  .addStringOption(opt =>
+    opt
+      .setName('game')
+      .setDescription('Select the game to show rank for (optional)')
+      .setRequired(false)
+      .setAutocomplete(true)
+  );
 
+// Add (requires game)
 const dkpAddCommand = new SlashCommandBuilder()
   .setName('dkpadd')
   .setDescription('Add DKP')
-  .addStringOption(option =>
-    option.setName('users')
-      .setDescription('The users to add DKP to, separated by commas for multiple users')
-      .setRequired(true))
-  .addIntegerOption(option =>
-    option.setName('points')
-      .setDescription('Number of DKP points to add')
-      .setRequired(true))
-  .addStringOption(option =>
-    option.setName('description')
-      .setDescription('Optional description for adding DKP'));
+  .addStringOption(opt =>
+    opt
+      .setName('game')
+      .setDescription('Select the game')
+      .setRequired(true)
+      .setAutocomplete(true)
+  )
+  .addStringOption(opt =>
+    opt
+      .setName('users')
+      .setDescription('Mentions or IDs (comma-separated)')
+      .setRequired(true)
+  )
+  .addIntegerOption(opt =>
+    opt
+      .setName('points')
+      .setDescription('Points to add')
+      .setRequired(true)
+  )
+  .addStringOption(opt =>
+    opt
+      .setName('description')
+      .setDescription('Optional description')
+  );
 
+// Remove (requires game)
 const dkpRemoveCommand = new SlashCommandBuilder()
   .setName('dkpremove')
   .setDescription('Remove DKP')
-  .addStringOption(option =>
-    option.setName('users')
-      .setDescription('The users to remove DKP from, separated by commas for multiple users')
-      .setRequired(true))
-  .addIntegerOption(option =>
-    option.setName('points')
-      .setDescription('Number of DKP points to remove')
-      .setRequired(true))
-  .addStringOption(option =>
-    option.setName('description')
-      .setDescription('Optional description for removing DKP'));
+  .addStringOption(opt =>
+    opt
+      .setName('game')
+      .setDescription('Select the game')
+      .setRequired(true)
+      .setAutocomplete(true)
+  )
+  .addStringOption(opt =>
+    opt
+      .setName('users')
+      .setDescription('Mentions or IDs (comma-separated)')
+      .setRequired(true)
+  )
+  .addIntegerOption(opt =>
+    opt
+      .setName('points')
+      .setDescription('Points to remove')
+      .setRequired(true)
+  )
+  .addStringOption(opt =>
+    opt
+      .setName('description')
+      .setDescription('Optional description')
+  );
 
-module.exports = { dkpCommand, dkpAddCommand, dkpRemoveCommand, rankCommand };
+module.exports = { dkpCommand, rankCommand, dkpAddCommand, dkpRemoveCommand };
