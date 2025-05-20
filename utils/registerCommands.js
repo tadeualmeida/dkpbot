@@ -1,4 +1,4 @@
-//utils/registerCommands.js
+// utils/registerCommands.js
 
 const { REST, Routes } = require('discord.js');
 const {

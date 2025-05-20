@@ -1,4 +1,4 @@
-//slashcommands/dkpSlash.js
+// slashcommands/dkpSlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 // Balance (optional game)

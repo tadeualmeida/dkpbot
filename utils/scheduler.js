@@ -1,4 +1,4 @@
-//utils/scheduler.js
+// utils/scheduler.js
 
 const schedule = require('node-schedule');
 const {

@@ -1,4 +1,4 @@
-//utils/permissions.js
+// utils/permissions.js
 const { PermissionsBitField } = require('discord.js');
 const { getGamesFromCache } = require('../utils/cacheManagement');
 

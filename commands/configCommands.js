@@ -1,4 +1,4 @@
-//commands/configCommands.js
+// commands/configCommands.js
 
 const { loadGuildConfig, invalidateGuildConfig } = require('../utils/config');
 const {

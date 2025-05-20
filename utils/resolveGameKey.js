@@ -1,4 +1,4 @@
-//utils/resolveGameKey.js
+// utils/resolveGameKey.js
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { getGamesFromCache } = require('./cacheManagement');
 

@@ -1,4 +1,4 @@
-//commands/reportCommands.js
+// commands/reportCommands.js
 const ExcelJS = require('exceljs');
 const Dkp = require('../schema/Dkp');
 const { AttachmentBuilder } = require('discord.js');

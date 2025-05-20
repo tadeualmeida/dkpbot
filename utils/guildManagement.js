@@ -1,4 +1,4 @@
-//guildManagement.js
+// guildManagement.js
 
 const { scheduleJob, cancelScheduledJob } = require('./scheduler');
 const Dkp = require('../schema/Dkp');

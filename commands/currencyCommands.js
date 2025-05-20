@@ -1,4 +1,4 @@
-//commands/currencyCommands.js
+// commands/currencyCommands.js
 
 const {
   getGamesFromCache,

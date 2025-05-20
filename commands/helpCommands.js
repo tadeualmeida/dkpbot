@@ -1,244 +1,102 @@
-//commands/helpCommands.js
 const { createInfoEmbed } = require('../utils/embeds');
 
 const commandCategories = {
-  General: {
-    description: 'General commands for basic bot operations.',
-    commands: [
-      { 
-        name: '/help [command]', 
-        description: 'Lists all available commands or shows detailed help for one.', 
-        permissions: 'Members', 
-        examples: ['/help', '/help dkp'] 
-      },
-      { 
-        name: '/showhelp', 
-        description: 'Displays all commands and descriptions publicly in this channel.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/showhelp'] 
-      },
-      { 
-        name: '/bank', 
-        description: 'Shows the current amount of crows in the guild bank.', 
-        permissions: 'Members', 
-        examples: ['/bank'] 
-      },
-      { 
-        name: '/reset <game>', 
-        description: 'Resets DKP points, events, and crows for a specific game.', 
-        permissions: 'Administrators', 
-        examples: ['/reset odin'] 
-      },
-    ]
-  },
-  DKP: {
-    description: 'Commands for managing and viewing DKP points.',
-    commands: [
-      { 
-        name: '/dkp [game]', 
-        description: 'Displays your current DKP balance, auto-selecting if you only have one game role.', 
-        permissions: 'Members', 
-        examples: ['/dkp', '/dkp odin'] 
-      },
-      { 
-        name: '/dkp add <game> <users> <points>', 
-        description: 'Adds DKP points to one or more users in a game.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/dkp add odin @user1 10', '/dkp add odin @user1 @user2 5'] 
-      },
-      { 
-        name: '/dkp remove <game> <users> <points>', 
-        description: 'Removes DKP points from one or more users in a game.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/dkp remove odin @user1 10', '/dkp remove odin @user2 5'] 
-      },
-      { 
-        name: '/rank [game]', 
-        description: 'Displays the DKP ranking for the guild (per-game).', 
-        permissions: 'Members', 
-        examples: ['/rank', '/rank odin'] 
-      },
-      { 
-        name: '/rankreport <game>', 
-        description: 'Generates a DKP rank report for a specific game as an Excel file.', 
-        permissions: 'Administrators', 
-        examples: ['/rankreport odin'] 
-      },
-    ]
-  },
-  Configuration: {
-    description: 'Commands for configuring bot settings and permissions.',
-    commands: [
-      { 
-        name: '/config role <game> <group> <role>', 
-        description: 'Sets which role can run which command-group for a game.', 
-        permissions: 'Administrators', 
-        examples: ['/config role odin admin @AdminRole'] 
-      },
-      { 
-        name: '/config dkp <game> <add|remove|edit|minimum> [name] [points]', 
-        description: 'Manages DKP parameters or minimum points for a game.', 
-        permissions: 'Administrators', 
-        examples: ['/config dkp odin add bossKill 10', '/config dkp odin minimum 50'] 
-      },
-      { 
-        name: '/config channel <game> <log|reminder> <#channel>', 
-        description: 'Sets or clears the channel for log/reminder messages.', 
-        permissions: 'Administrators', 
-        examples: ['/config channel odin log #logs', '/config channel odin reminder #reminders'] 
-      },
-      { 
-        name: '/config reminder <game> <add|remove|intervals> [parameter] [intervals]', 
-        description: 'Manage which event parameters you want reminders for and at which intervals.', 
-        permissions: 'Administrators', 
-        examples: [
-          '/config reminder odin add bossKill',
-          '/config reminder odin intervals 1h,30m,10m',
+    General: {
+        description: 'General commands for basic bot operations.',
+        commands: [
+            { name: '/help', description: 'Lists all available commands and their descriptions.', permissions: 'Members', examples: ['/help', '/help dkp'] },
+            { name: '/showhelp', description: 'Displays all available commands to everyone in the current channel.', permissions: 'Administrators, Moderators', examples: ['/showhelp'] },
+            { name: '/bank', description: 'Shows the current amount of crows in the guild bank.', permissions: 'Members', examples: ['/bank'] },
+            { name: '/reset', description: 'Resets all DKP points, events, and crows for the guild.', permissions: 'Administrators', examples: ['/reset'] },
         ]
-      },
-      { 
-        name: '/config show <game> <parameters|channels|minimum|event|reminder>', 
-        description: 'Shows current configuration of DKP parameters, channels, timers, or reminders.', 
-        permissions: 'Administrators', 
-        examples: ['/config show odin parameters', '/config show odin reminder'] 
-      },
-      { 
-        name: '/config event <game> timer <minutes>', 
-        description: 'Sets the default event timer length for a game.', 
-        permissions: 'Administrators', 
-        examples: ['/config event odin timer 15'] 
-      },
-      { 
-        name: '/config game <add|remove|rename> [key] [name] [currency]', 
-        description: 'Add, remove, or rename a game in this guild.', 
-        permissions: 'Administrators', 
-        examples: ['/config game add odin "Odin: Rise" crows'] 
-      },
-      { 
-        name: '/config guildname <name>', 
-        description: 'Sets the custom display name for this guild in embeds.', 
-        permissions: 'Administrators', 
-        examples: ['/config guildname "My Awesome Guild"'] 
-      },
-    ]
-  },
-  Event: {
-    description: 'Commands for managing and participating in events.',
-    commands: [
-      { 
-        name: '/event start <game> <parameter>', 
-        description: 'Starts a DKP event for a given parameter in a game.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/event start odin bossKill'] 
-      },
-      { 
-        name: '/event end <game> <code>', 
-        description: 'Ends the specified event and awards DKP.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/event end odin AB3'] 
-      },
-      { 
-        name: '/event cancel <game> <code>', 
-        description: 'Cancels the event without awarding DKP.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/event cancel odin AB3'] 
-      },
-      { 
-        name: '/join <code>', 
-        description: 'Join an active event by its code (auto-detects game).', 
-        permissions: 'Members', 
-        examples: ['/join AB3'] 
-      },
-      { 
-        name: '/event rank <game> <parameter>', 
-        description: 'Shows cumulative DKP earned across all events of that parameter.', 
-        permissions: 'Members', 
-        examples: ['/event rank odin bossKill'] 
-      },
-    ]
-  },
-  Crow: {
-    description: 'Commands for managing “crows” in your guild bank.',
-    commands: [
-      { 
-        name: '/crow add <game> <amount>', 
-        description: 'Adds crows to the guild bank for a game.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/crow add odin 100'] 
-      },
-      { 
-        name: '/crow remove <game> <amount>', 
-        description: 'Removes crows from the guild bank for a game.', 
-        permissions: 'Administrators, Moderators', 
-        examples: ['/crow remove odin 50'] 
-      },
-    ]
-  },
-  Reminder: {
-    description: 'Commands for setting up spawn reminders on parameters.',
-    commands: [
-      { 
-        name: '/reminder <game> <parameter(s)> <time(s)>', 
-        description: 'Schedules countdown reminders (with pre-alerts) for event parameters.', 
-        permissions: 'Members', 
-        examples: [
-          '/reminder odin bossKill 2h',
-          '/reminder odin bossKill,dragon 1h30m,45m'
+    },
+    DKP: {
+        description: 'Commands for managing and viewing DKP points.',
+        commands: [
+            { name: '/dkp', description: 'Displays your current DKP balance.', permissions: 'Members', examples: ['/dkp'] },
+            { name: '/dkp add <users> <points>', description: 'Adds DKP points to one or more users.', permissions: 'Administrators, Moderators', examples: ['/dkp add @user1 10', '/dkp add @user1 @user2 5'] },
+            { name: '/dkp remove <users> <points>', description: 'Removes DKP points from one or more users.', permissions: 'Administrators, Moderators', examples: ['/dkp remove @user1 10', '/dkp remove @user1 @user2 5'] },
+            { name: '/rank', description: 'Displays the DKP ranking for the guild.', permissions: 'Members', examples: ['/rank'] },
+            { name: '/rankreport', description: 'Generates a report of the DKP ranking.', permissions: 'Administrators', examples: ['/rankreport'] },
         ]
-      },
-    ]
-  }
+    },
+    Configuration: {
+        description: 'Commands for configuring bot settings and permissions.',
+        commands: [
+            { name: '/config dkp <action> <name> <points>', description: 'Manages DKP parameters (add, remove, edit, or set minimum points).', permissions: 'Administrators', examples: ['/config dkp add bossKill 10', '/config dkp remove bossKill'] },
+            { name: '/config role <commandGroup> <role>', description: 'Sets role permissions for command groups.', permissions: 'Administrators', examples: ['/config role administrators @admin', '/config role moderators @mod'] },
+            { name: '/config channel <action> <channel>', description: 'Manages channels for bot notifications.', permissions: 'Administrators', examples: ['/config channel add #general', '/config channel remove #general'] },
+            { name: '/config event timer <minutes>', description: 'Sets the event timer duration.', permissions: 'Administrators', examples: ['/config event timer 10'] },
+            { name: '/config show <parameters|channels|minimum|event>', description: 'Shows current configuration settings.', permissions: 'Administrators', examples: ['/config show parameters', '/config show channels', '/config show minimum', '/config show event'] },
+        ]
+    },
+    Event: {
+        description: 'Commands for managing and participating in events.',
+        commands: [
+            { name: '/event start <parameter>', description: 'Starts an event with the specified parameter.', permissions: 'Administrators, Moderators', examples: ['/event start bossKill'] },
+            { name: '/event end <code>', description: 'Ends the event with the specified code.', permissions: 'Administrators, Moderators', examples: ['/event end AB3'] },
+            { name: '/event cancel <code>', description: 'Cancels the event with the specified code and removes DKP points.', permissions: 'Administrators, Moderators', examples: ['/event cancel AB3'] },
+            { name: '/join <code>', description: 'Joins the event with the specified code.', permissions: 'Members', examples: ['/join AB3'] },
+            { name: '/event rank <parameter>', description: 'Displays the DKP ranking for the specified parameter.', permissions: 'Members', examples: ['/event rank bossKill'] },  // Novo comando adicionado
+        ]
+    },
+    Crow: {
+        description: 'Commands for managing crows in the guild bank.',
+        commands: [
+            { name: '/crow add <amount>', description: 'Adds a specified amount of crows to the guild bank.', permissions: 'Administrators, Moderators', examples: ['/crow add 100'] },
+            { name: '/crow remove <amount>', description: 'Removes a specified amount of crows from the guild bank.', permissions: 'Administrators, Moderators', examples: ['/crow remove 50'] },
+        ]
+    }
 };
 
 async function handleHelpCommand(interaction) {
-  const cmd = interaction.options.getString('command');
-  if (cmd) {
-    const info = getDetailedCommandInfo(cmd);
-    if (info) {
-      return interaction.reply({ embeds: [ createInfoEmbed(`Help: ${cmd}`, info) ], ephemeral: true });
+    const commandName = interaction.options.getString('command');
+
+    if (commandName) {
+        const detailedInfo = getDetailedCommandInfo(commandName);
+        if (detailedInfo) {
+            const embed = createInfoEmbed(`Help: ${commandName}`, detailedInfo);
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+        } else {
+            await interaction.reply({ content: 'Command not found.', ephemeral: true });
+        }
     } else {
-      return interaction.reply({ content: 'Command not found.', ephemeral: true });
+        const descriptions = Object.entries(commandCategories).map(([category, { description, commands }]) => {
+            const commandsList = commands.map(command => 
+                `**${command.name}** - ${command.description} (Permissions: ${command.permissions})`
+            ).join('\n');
+            return `**${category} Commands:**\n${description}\n\n${commandsList}`;
+        }).join('\n\n');
+
+        const embed = createInfoEmbed('Available Commands', descriptions);
+        await interaction.reply({ embeds: [embed], ephemeral: true });
     }
-  }
-
-  // show full list
-  const text = Object.entries(commandCategories)
-    .map(([cat, { description, commands }]) => {
-      const list = commands
-        .map(c => `**${c.name}** – ${c.description} (Permissions: ${c.permissions})`)
-        .join('\n');
-      return `**${cat} Commands:**\n${description}\n${list}`;
-    })
-    .join('\n\n');
-
-  return interaction.reply({ embeds: [ createInfoEmbed('Available Commands', text) ], ephemeral: true });
 }
 
 async function handleShowHelpCommand(interaction) {
-  // same as /help but public
-  const text = Object.entries(commandCategories)
-    .map(([cat, { description, commands }]) => {
-      const list = commands
-        .map(c => `**${c.name}** – ${c.description}`)
-        .join('\n');
-      return `**${cat} Commands:**\n${description}\n${list}`;
-    })
-    .join('\n\n');
+    const descriptions = Object.entries(commandCategories).map(([category, { description, commands }]) => {
+        const commandsList = commands.map(command => 
+            `**${command.name}** - ${command.description} (Permissions: ${command.permissions})`
+        ).join('\n');
+        return `**${category} Commands:**\n${description}\n\n${commandsList}`;
+    }).join('\n\n');
 
-  return interaction.reply({ embeds: [ createInfoEmbed('Available Commands', text) ] });
+    const embed = createInfoEmbed('Available Commands', descriptions);
+    await interaction.reply({ embeds: [embed] });
 }
 
 function getDetailedCommandInfo(commandName) {
-  const clean = commandName.startsWith('/') ? commandName : `/${commandName}`;
-  for (const { commands } of Object.values(commandCategories)) {
-    for (const cmd of commands) {
-      if (cmd.name.split(' ')[0] === clean.split(' ')[0]) {
-        const ex = cmd.examples.map(x => `\`${x}\``).join('\n');
-        return `**Command:** ${cmd.name}\n**Description:** ${cmd.description}\n**Permissions:** ${cmd.permissions}\n**Examples:**\n${ex}`;
-      }
+    const cleanCommandName = commandName.startsWith('/') ? commandName : `/${commandName}`;
+    for (const { commands } of Object.values(commandCategories)) {
+        for (const command of commands) {
+            if (command.name.split(' ')[0] === cleanCommandName.split(' ')[0] &&
+                command.name.includes(cleanCommandName.split(' ')[1] || '')) {
+                const examples = command.examples.map(example => `\`${example}\``).join('\n');
+                return `**Command:** ${command.name}\n**Description:** ${command.description}\n**Permissions:** ${command.permissions}\n**Usage Examples:**\n${examples}`;
+            }
+        }
     }
-  }
-  return null;
+    return null;
 }
 
 module.exports = { handleHelpCommand, handleShowHelpCommand };

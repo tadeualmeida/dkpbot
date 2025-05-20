@@ -1,4 +1,3 @@
-//
 const Event = require('../schema/Event');
 
 async function clearEmptyEvents() {

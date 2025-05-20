@@ -1,4 +1,4 @@
-//utils/config.js
+// utils/config.js
 const GuildConfig = require('../schema/GuildConfig');
 const configCache = new Map(); // guildId → GuildConfig document
 

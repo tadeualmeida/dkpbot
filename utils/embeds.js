@@ -1,4 +1,4 @@
-//utils/embeds.js
+// utils/embeds.js
 
 const { EmbedBuilder } = require('discord.js');
 

@@ -1,4 +1,4 @@
-//commands/eventCommands.js
+// commands/eventCommands.js
 
 const validator = require('validator');
 const {

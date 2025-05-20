@@ -1,4 +1,4 @@
-//slashcommands/reminderSlash.js
+// slashcommands/reminderSlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const reminderCommand = new SlashCommandBuilder()

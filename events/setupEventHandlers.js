@@ -1,4 +1,4 @@
-//events/setupEventHandlers.js
+// events/setupEventHandlers.js
 
 const { handleInteractionCreate } = require('./interactionCreate');
 const { registerCommands }         = require('../utils/registerCommands');

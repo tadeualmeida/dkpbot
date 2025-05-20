@@ -1,4 +1,4 @@
-//slashcommands/reportSlash.js
+// slashcommands/reportSlash.js
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const reportSlash = new SlashCommandBuilder()

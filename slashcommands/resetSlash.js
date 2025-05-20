@@ -1,4 +1,4 @@
-//slashcommands/resetSlash.js
+// slashcommands/resetSlash.js
 
 const { SlashCommandBuilder } = require('@discordjs/builders');
 

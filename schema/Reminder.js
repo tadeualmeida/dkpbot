@@ -1,4 +1,4 @@
-//schema/Reminder.js
+// schema/Reminder.js
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

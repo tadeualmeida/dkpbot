@@ -1,4 +1,4 @@
-//utils/channelUtils.js
+// utils/channelUtils.js
 
 const { loadGuildConfig } = require('./config');
 const { createInfoEmbed } = require('./embeds');

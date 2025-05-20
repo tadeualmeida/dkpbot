@@ -1,4 +1,4 @@
-//commands/resetCommands.js
+// commands/resetCommands.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Event    = require('../schema/Event');
 const Dkp      = require('../schema/Dkp');

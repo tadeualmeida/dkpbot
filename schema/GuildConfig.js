@@ -1,4 +1,4 @@
-//schema/GuildConfig.js
+// schema/GuildConfig.js
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 

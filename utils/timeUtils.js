@@ -1,4 +1,4 @@
-//utils/timeUtils.js
+// utils/timeUtils.js
 const DURATION_RE = /(\d+)([smhd])/g;
 
 /**

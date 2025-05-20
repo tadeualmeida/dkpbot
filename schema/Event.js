@@ -1,4 +1,4 @@
-//schema/Event.js
+// schema/Event.js
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
