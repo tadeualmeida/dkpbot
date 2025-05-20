@@ -125,51 +125,43 @@ async function handleConfigCommands(interaction) {
 
     // ---- REMINDER ----
     case 'reminder': {
-      const action     = interaction.options.getString('action');      // 'add', 'remove', or 'intervals'
-      const paramName  = interaction.options.getString('parameter');   // e.g. 'BOSS-XYZ'
-      const intervals  = interaction.options.getString('intervals');   // e.g. '1h,30m,10m'
-      let actionText;
+      const action    = interaction.options.getString('action');      // 'add', 'remove', or 'intervals'
+      const rawParams = interaction.options.getString('parameter');   // e.g. "Fulano, Beturano, Ciclano"
+      const intervals = interaction.options.getString('intervals');   // e.g. "1h,30m,10m"
 
       // ensure arrays exist
       gameCfg.reminders ||= [];
       gameCfg.reminderIntervals ||= [];
 
       if (action === 'add') {
-        if (!paramName) {
-          return interaction.reply({
-            embeds: [ createErrorEmbed('Parameter name is required to add.') ],
-            ephemeral: true
-          });
+        if (!rawParams) {
+          return interaction.reply({ embeds: [ createErrorEmbed('Parameter name is required to add.') ], ephemeral: true });
         }
-        gameCfg.reminders.push(paramName.trim());
-        actionText = 'added';
+        // **split on commas** and push each trimmed name
+        const names = rawParams.split(',').map(s => s.trim()).filter(Boolean);
+        names.forEach(name => {
+          if (!gameCfg.reminders.includes(name)) {
+            gameCfg.reminders.push(name);
+          }
+        });
+        actionText = `added: ${names.join(', ')}`;
       }
       else if (action === 'remove') {
-        if (!paramName) {
-          return interaction.reply({
-            embeds: [ createErrorEmbed('Parameter name is required to remove.') ],
-            ephemeral: true
-          });
-        }
-        gameCfg.reminders = gameCfg.reminders.filter(p => p !== paramName.trim());
-        actionText = 'removed';
+        // similarly split & filter
+        const names = rawParams.split(',').map(s => s.trim()).filter(Boolean);
+        gameCfg.reminders = gameCfg.reminders.filter(p => !names.includes(p));
+        actionText = `removed: ${names.join(', ')}`;
       }
       else if (action === 'intervals') {
         if (!intervals) {
-          return interaction.reply({
-            embeds: [ createErrorEmbed('Intervals are required for this action (e.g. `1h,30m,10m`).') ],
-            ephemeral: true
-          });
+          return interaction.reply({ embeds: [ createErrorEmbed('Intervals are required for this action.') ], ephemeral: true });
         }
         gameCfg.reminderIntervals = intervals.split(',').map(s => s.trim());
-        actionText = 'intervals set';
+        actionText = `intervals set to: ${gameCfg.reminderIntervals.join(', ')}`;
       } else {
-        return interaction.reply({
-          embeds: [ createErrorEmbed('Invalid reminder action.') ],
-          ephemeral: true
-        });
+        return interaction.reply({ embeds: [ createErrorEmbed('Invalid reminder action.') ], ephemeral: true });
       }
-
+      
       break;
     }
 
