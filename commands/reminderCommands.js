@@ -29,62 +29,69 @@ async function handleReminderCommand(interaction) {
   const gameCfg = cfg.games.find(g => g.key === gameKey);
   if (!gameCfg) {
     return interaction.editReply({
-      embeds: [ createErrorEmbed(
+      embeds: [createErrorEmbed(
         'Unknown Game',
         `No configuration found for game **${gameKey}**.`
-      ) ]
+      )]
     });
   }
 
   // 2️⃣ Parse params & times
-  const params = rawParams.split(',').map(s => s.trim()).filter(Boolean);
-  const times  = rawTimes.split(',').map(s => s.trim()).filter(Boolean);
+  const params = rawParams.split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const times  = rawTimes.split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   // 3️⃣ Validate each param
   for (const p of params) {
     if (!Array.isArray(gameCfg.reminders) || !gameCfg.reminders.includes(p)) {
       return interaction.editReply({
-        embeds: [ createErrorEmbed(
+        embeds: [createErrorEmbed(
           'Unknown Parameter',
           `Reminder parameter **${p}** is not configured for **${gameCfg.name}**.`
-        ) ]
+        )]
       });
     }
   }
 
-  // 4️⃣ Match params ↔ times
+  // 4️⃣ Match params ↔ times cardinality
   let scheduleList;
   if (times.length === 1) {
+    // single time for all params
     scheduleList = params.map(p => ({ param: p, time: times[0] }));
   } else if (times.length === params.length) {
+    // one-to-one
     scheduleList = params.map((p, i) => ({ param: p, time: times[i] }));
   } else {
     return interaction.editReply({
-      embeds: [ createErrorEmbed(
+      embeds: [createErrorEmbed(
         'Mismatched Counts',
         `You provided ${params.length} parameter(s) but ${times.length} time value(s).`
-      ) ]
+      )]
     });
   }
 
-  // 5️⃣ Cancel existing reminders
+  // 5️⃣ Cancel any existing reminders for these combos
   for (const { param } of scheduleList) {
     await cancelScheduledReminder(guildId, gameKey, param);
   }
 
-  // 6️⃣ Schedule new ones & build confirmation lines
-  const lines = [];
+  // 6️⃣ Schedule each reminder & build confirmation lines
+  const confirmationLines = [];
   for (const { param, time } of scheduleList) {
     const ms = parseDuration(time);
     if (isNaN(ms) || ms <= 0) {
       return interaction.editReply({
-        embeds: [ createErrorEmbed(
+        embeds: [createErrorEmbed(
           'Invalid Time',
           `Could not parse duration **${time}**. Use formats like \`1h30m\`, \`45m\`, or \`10s\`.`
-        ) ]
+        )]
       });
     }
 
+    // scheduleReminder(guildId, gameKey, parameterName, intervals[], targetTimestamp, interaction)
     await scheduleReminder(
       guildId,
       gameKey,
@@ -94,35 +101,36 @@ async function handleReminderCommand(interaction) {
       interaction
     );
 
-    const targetAt = new Date(Date.now() + ms).toLocaleString();
-    const ivals    = (gameCfg.reminderIntervals || [])
+    const targetAt  = new Date(Date.now() + ms).toLocaleString();
+    const ivalsText = (gameCfg.reminderIntervals || [])
       .map(i => formatDuration(parseDuration(i)))
       .join(', ') || 'none';
 
-    lines.push(
-      `• **${param}** in **${time}** (at ${targetAt}); pre-alerts at [${ivals}]`
+    confirmationLines.push(
+      `• **${param}** in **${time}** (at ${targetAt}); pre-alerts at [${ivalsText}] before`
     );
   }
 
-  // 7️⃣ Log in the reminder channel
+  // 7️⃣ Log into the game’s **reminder** channel
   const logLines = scheduleList
     .map(({ param, time }) =>
       `• **${interaction.member.displayName}** → **${param}** in ${time}`
-    ).join('\n');
+    )
+    .join('\n');
 
   await sendMessageToConfiguredChannels(
     interaction,
     `New reminder(s) for **${gameCfg.name}**:\n${logLines}`,
-    'reminder',
+    'log',
     gameKey
   );
 
-  // 8️⃣ Reply with confirmation
+  // 8️⃣ Reply back to the user
   return interaction.editReply({
-    embeds: [ createInfoEmbed(
+    embeds: [createInfoEmbed(
       'Reminder Scheduled',
-      lines.join('\n')
-    ) ]
+      confirmationLines.join('\n')
+    )]
   });
 }
 

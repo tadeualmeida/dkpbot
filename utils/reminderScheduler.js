@@ -1,16 +1,23 @@
 // utils/reminderScheduler.js
 
-const schedule   = require('node-schedule');
-const Reminder   = require('../schema/Reminder');
+const schedule = require('node-schedule');
+const Reminder = require('../schema/Reminder');
 const { sendMessageToConfiguredChannels } = require('./channelUtils');
-const { parseDuration, formatDuration }  = require('./timeUtils');
+const { parseDuration } = require('./timeUtils');
 
-// In‐memory map of scheduled reminder jobs
+// In-memory map of scheduled reminder jobs
 const scheduledReminders = new Map();
 
 /**
  * Schedule reminders at specified intervals before a target time,
  * and persist them to the database.
+ *
+ * @param {string} guildId
+ * @param {string} gameKey
+ * @param {string} parameterName
+ * @param {string[]} intervals      e.g. ['1h','30m','10m']
+ * @param {Date|number} targetTime  When the countdown ends (Date or ms timestamp)
+ * @param {CommandInteraction} interaction
  */
 async function scheduleReminder(
   guildId,
@@ -23,7 +30,7 @@ async function scheduleReminder(
   const baseKey = `${guildId}:${gameKey}:${parameterName}`;
   const ts      = targetTime instanceof Date ? targetTime : new Date(targetTime);
 
-  // 1) Upsert no MongoDB (cria ou atualiza)
+  // 1) Upsert into MongoDB (create if missing, update if exists)
   try {
     await Reminder.findOneAndUpdate(
       { guildId, gameKey, parameterName },
@@ -35,7 +42,7 @@ async function scheduleReminder(
     throw err;
   }
 
-  // 2) Limpa apenas os jobs em memória, NÃO remove do DB
+  // 2) Clear only in-memory jobs; DB record remains
   for (const [key, job] of scheduledReminders.entries()) {
     if (key.startsWith(baseKey)) {
       job.cancel();
@@ -43,10 +50,11 @@ async function scheduleReminder(
     }
   }
 
-  // 3) Agenda alertas de intervalo (sem @here)
+  // 3) Schedule each interval alert (without @here)
   for (const intervalStr of intervals) {
     const ms = parseDuration(intervalStr);
     if (isNaN(ms)) continue;
+
     const runAt = new Date(ts.getTime() - ms);
     if (runAt <= Date.now()) continue;
 
@@ -54,7 +62,7 @@ async function scheduleReminder(
     const job = schedule.scheduleJob(runAt, async () => {
       await sendMessageToConfiguredChannels(
         interaction,
-        `⌛ Reminder: **${parameterName}** will spawn in **${intervalStr}** please go to the boss location and save your safe/regroup teleport.`,
+        `⌛ Reminder: **${parameterName}** will spawn in **${intervalStr}**.`,
         'reminder',
         gameKey
       );
@@ -63,20 +71,19 @@ async function scheduleReminder(
     scheduledReminders.set(jobKey, job);
   }
 
-  // 4) Agenda o alerta final (com @here) e aí sim apaga do DB após disparar
+  // 4) Schedule the final “NOW” alert (with @here). After sending, delete the DB record.
   const finalKey = `${baseKey}:final`;
   if (ts > Date.now()) {
     const finalJob = schedule.scheduleJob(ts, async () => {
       await sendMessageToConfiguredChannels(
         interaction,
-        `@here \n
-        🔔 Reminder: **${parameterName}** is about to spawn! Group up NOW at saved location. Get in discord voice!`,
+        `@here 🔔 Reminder: **${parameterName}** is spawning now! Group up and get ready!`,
         'reminder',
         gameKey
       );
       scheduledReminders.delete(finalKey);
 
-      // 5) Agora sim remove o documento, pois o reminder expirou
+      // 5) Cleanup DB record since it has fired
       await Reminder.deleteOne({ guildId, gameKey, parameterName });
     });
     scheduledReminders.set(finalKey, finalJob);
@@ -84,9 +91,12 @@ async function scheduleReminder(
 }
 
 /**
- * Cancela apenas os jobs em memória e **não** remove o registro do DB.
- * A remoção do documento só deve ocorrer em caso de cancelamento
- * explícito (veja função abaixo) ou no alerta final.
+ * Cancel all scheduled reminders (in-memory jobs) for a given guild+game+parameter.
+ * Does **not** remove the DB record—that only happens if the user explicitly calls cancel.
+ *
+ * @param {string} guildId
+ * @param {string} gameKey
+ * @param {string} parameterName
  */
 function clearScheduledJobs(guildId, gameKey, parameterName) {
   const baseKey = `${guildId}:${gameKey}:${parameterName}`;
@@ -99,17 +109,15 @@ function clearScheduledJobs(guildId, gameKey, parameterName) {
 }
 
 /**
- * Cancel all scheduled reminders (in‐memory jobs) and also remove do DB
- * *quando o usuário pedir explicitamente*.
+ * Cancel all scheduled reminders (in-memory jobs) and also remove the DB record.
+ * Use this when the user explicitly wants to cancel.
+ *
+ * @param {string} guildId
+ * @param {string} gameKey
+ * @param {string} parameterName
  */
-async function cancelScheduledReminder(
-  guildId,
-  gameKey,
-  parameterName
-) {
+async function cancelScheduledReminder(guildId, gameKey, parameterName) {
   clearScheduledJobs(guildId, gameKey, parameterName);
-
-  // Remove do banco
   await Reminder.deleteOne({ guildId, gameKey, parameterName });
 }
 

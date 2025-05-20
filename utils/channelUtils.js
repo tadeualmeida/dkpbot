@@ -4,36 +4,45 @@ const { loadGuildConfig } = require('./config');
 const { createInfoEmbed } = require('./embeds');
 
 /**
- * Sends a single embed to the configured log channel for the given game.
+ * Sends a single embed to the configured channel for the given game.
  * If no channel is configured, silently does nothing.
  *
  * @param {CommandInteraction} interaction
- * @param {string} description      // já vem formatada com o executor e as linhas
- * @param {'dkp'|'event'|'crow'|string} messageType
- * @param {string} gameKey          // para buscar o canal correto
+ * @param {string} description      // already formatted with executor and lines
+ * @param {'dkp'|'event'|'crow'|'reminder'|string} messageType
+ * @param {string} gameKey          // to look up the right game in config
  */
 async function sendMessageToConfiguredChannels(interaction, description, messageType, gameKey) {
-  // 1) carrega configuração atualizada
-  const cfg = await loadGuildConfig(interaction.guildId);
+  // 1) load the latest config
+  const cfg  = await loadGuildConfig(interaction.guildId);
   const game = cfg.games.find(g => g.key === gameKey);
-  if (!game) return;               // jogo não encontrado
-  const channelId = game.channels.log;
-  if (!channelId) return;          // sem canal log configurado
+  if (!game) return;            // no such game
 
-  // 2) busca o canal
+  // 2) choose the correct channel based on messageType
+  let channelId;
+  if (messageType === 'reminder') {
+    channelId = game.channels.reminder;
+  } else {
+    // all other types default to the log channel
+    channelId = game.channels.log;
+  }
+  if (!channelId) return;       // channel not set
+
+  // 3) fetch the channel
   const channel = interaction.client.channels.cache.get(channelId);
-  if (!channel || !channel.send) return;
+  if (!channel || typeof channel.send !== 'function') return;
 
-  // 3) título do embed
+  // 4) build an appropriate title for the embed
   let title;
   switch (messageType) {
-    case 'dkp':   title = 'DKP Info';    break;
-    case 'event': title = 'Event Info';  break;
-    case 'crow':  title = 'Crow Info';   break;
-    default:      title = 'Info';
+    case 'dkp':      title = 'DKP Info';    break;
+    case 'event':    title = 'Event Info';  break;
+    case 'crow':     title = 'Crow Info';   break;
+    case 'reminder': title = 'Reminder';    break;
+    default:         title = 'Info';
   }
 
-  // 4) envia
+  // 5) send it
   await channel.send({
     embeds: [ createInfoEmbed(title, description) ]
   });
