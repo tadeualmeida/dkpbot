@@ -8,7 +8,7 @@ const { loadGuildConfig, invalidateGuildConfig } = require('../utils/config');
  * participants: [{ userId, pointChange }]
  * guildId: string
  * gameKey: string
- * dkpPoints: number (positivo ou negativo)
+ * dkpPoints: number (positive or negative)
  * description: string
  */
 function isPositiveInteger(value) {
@@ -47,6 +47,7 @@ async function fetchGuildMember(guild, userId) {
 
 async function fetchUserToModify(userID, interaction) {
   if (!/^\d+$/.test(userID)) {
+    // Escape any text that’s not purely digits
     const username = validator.escape(userID);
     return interaction.guild.members.cache.find(m =>
       validator.escape(m.user.username) === username
@@ -57,7 +58,7 @@ async function fetchUserToModify(userID, interaction) {
 
 /**
  * Returns { pointChange, userDkp }
- * If getGuildCache is a valid function, writes the updated DKP back into cache.
+ * If getGuildCache is a valid function, writes the updated DKP back into the in‐memory cache.
  */
 async function getUserDkpChanges(
   guildId,
@@ -71,19 +72,19 @@ async function getUserDkpChanges(
 ) {
   let pointChange = isAdd ? pointsToModify : -pointsToModify;
 
-  // Fetch or create the DKP record from the persisted DB via cache
+  // Fetch (or create) the DKP record from database (via cache)
   let userDkp = await getDkpPointsFromCache(guildId, gameKey, userID);
   if (!userDkp) {
     userDkp = await Dkp.create({ guildId, gameKey, userId: userID, points: 0 });
   }
 
-  // Prevent going negative
+  // Prevent negative totals
   if (!isAdd && userDkp.points + pointChange < 0) {
     pointChange = -userDkp.points;
   }
   userDkp.points += pointChange;
 
-  // If provided a valid getGuildCache, update the in‐memory cache
+  // If provided a getGuildCache(), update the in-memory cache:
   if (typeof getGuildCache === 'function') {
     const cache = getGuildCache(guildId);
     if (cache && typeof cache.set === 'function') {
@@ -103,7 +104,7 @@ async function replyWithError(interaction, title, description) {
 }
 
 /**
- * Incrementa totalDkp dentro do objeto de jogo no GuildConfig
+ * Increments totalDkp in the GuildConfig document
  */
 async function updateDkpTotal(pointsToModify, guildId, gameKey) {
   const cfg = await loadGuildConfig(guildId);

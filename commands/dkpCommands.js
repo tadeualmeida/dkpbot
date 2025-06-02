@@ -220,19 +220,27 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     return interaction.editReply({ content: 'You must specify at least one user ID.', ephemeral: true });
   }
 
-  // parse and dedupe user IDs
+  // 1) Split on whitespace or commas, THEN extract only the digits inside <@123…> or <@!123…>
   const userIDs = Array.from(new Set(
-    userIDsInput.split(/[,\s]+/).map(s => s.replace(/<@!?(\d+)>/, '$1'))
+    userIDsInput
+      .split(/[,\s]+/)                 // split on comma or any whitespace
+      .map(token => {
+        // match exactly "<@123…>" or "<@!123…>"
+        const m = token.match(/^<@!?(\d+)>$/);
+        return m ? m[1] : token;        // if it matched, return the digits, otherwise return token unchanged
+      })
+      .filter(s => /^\d+$/.test(s))     // only keep purely numeric strings (valid IDs)
   ));
 
   const participants = [];
   let totalPts = 0;
 
   for (const userId of userIDs) {
+    // 2) Try to fetch the guild member via ID (display name never enters into this)
     const userToModify = await fetchUserToModify(userId, interaction);
     if (!userToModify) continue;
 
-    // 1️⃣ Pass a real cache‐setter function so getUserDkpChanges can update after each change
+    // 3) Pass a real cache‐setter so getUserDkpChanges can update the in‐memory cache
     const cacheSetter = (gid) => getGuildCache(gid);
 
     const { pointChange, userDkp } = await getUserDkpChanges(
@@ -249,12 +257,12 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     participants.push({ userId, pointChange });
     totalPts += pointChange;
 
-    // 2️⃣ DM the user via your queue
+    // 4) DM the user to inform them of their change
     await sendUserNotification(userToModify, pointChange, userDkp.points, descriptionInput);
   }
 
   if (participants.length) {
-    // 3️⃣ Bulk‐write all transactions
+    // 5) Bulk‐write all transactions in a single DB operation
     const bulkOps = createBulkOperations(
       participants,
       guildId,
@@ -265,14 +273,14 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     await Dkp.bulkWrite(bulkOps);
     await updateDkpTotal(totalPts, guildId, gameKey);
 
-    // 4️⃣ Refresh caches again after the DB write
+    // 6) Refresh caches after the write so everything is consistent
     await Promise.all([
       refreshDkpPointsCache(guildId, gameKey),
       refreshEligibleUsersCache(guildId, gameKey),
       refreshDkpRankingCache(guildId, gameKey),
     ]);
 
-    // 5️⃣ Build & send one log embed to the configured “dkp” (log) channel
+    // 7) Send ONE “log” message into the configured “dkp” channel
     const actor = interaction.member.displayName || interaction.user.username;
     const actionLines = participants.map(p =>
       p.pointChange > 0
@@ -285,7 +293,7 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     await sendMessageToConfiguredChannels(interaction, logDesc, 'dkp', gameKey);
   }
 
-  // 6️⃣ Finally, reply with a summary
+  // 8) Finally, reply to the slash command with a summary embed
   const results = participants.map(p =>
     p.pointChange > 0
       ? `Added **${p.pointChange}** DKP to <@${p.userId}>`
