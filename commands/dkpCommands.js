@@ -3,15 +3,13 @@
 const {
   getDkpPointsFromCache,
   refreshDkpPointsCache,
-  getDkpMinimumFromCache,
   refreshDkpMinimumCache,
   getCurrencyFromCache,
   refreshCurrencyCache,
   refreshEligibleUsersCache,
-  getEligibleUsersFromCache,
   refreshDkpRankingCache,
-  getDkpRankingFromCache,
-  getGamesFromCache
+  getGamesFromCache,
+  getGuildCache
 } = require('../utils/cacheManagement');
 
 const {
@@ -60,11 +58,11 @@ async function handleDkpBalance(interaction, guildId, userId) {
   const gamesArr = await getGamesFromCache(guildId);
 
   // find games where member has the "user" role
-const playable = gamesArr.filter(g =>
-  g.roles.user.some(roleId =>
-    interaction.member.roles.cache.has(roleId)
-  )
-);
+  const playable = gamesArr.filter(g =>
+    g.roles.user.some(roleId =>
+      interaction.member.roles.cache.has(roleId)
+    )
+  );
 
   // explicit request → single
   if (explicit) {
@@ -84,7 +82,7 @@ const playable = gamesArr.filter(g =>
   // multiple → list all
   await interaction.deferReply({ ephemeral: true });
 
-  // refresh caches
+  // refresh caches for each playable game
   await Promise.all(playable.map(g =>
     Promise.all([
       refreshDkpPointsCache(guildId, g.key),
@@ -206,6 +204,14 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
 
   await interaction.deferReply({ ephemeral: true });
 
+  // 0️⃣ Immediately refresh all relevant caches for that game
+  await Promise.all([
+    refreshDkpPointsCache(guildId, gameKey),
+    refreshEligibleUsersCache(guildId, gameKey),
+    refreshCurrencyCache(guildId, gameKey),
+    refreshDkpMinimumCache(guildId, gameKey),
+  ]);
+
   const pointsToModify   = interaction.options.getInteger('points');
   const userIDsInput     = interaction.options.getString('users');
   const descriptionInput = interaction.options.getString('description') || '';
@@ -226,19 +232,29 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     const userToModify = await fetchUserToModify(userId, interaction);
     if (!userToModify) continue;
 
+    // 1️⃣ Pass a real cache‐setter function so getUserDkpChanges can update after each change
+    const cacheSetter = (gid) => getGuildCache(gid);
+
     const { pointChange, userDkp } = await getUserDkpChanges(
-      guildId, gameKey, userId, pointsToModify, isAdd, Dkp,
+      guildId,
+      gameKey,
+      userId,
+      pointsToModify,
+      isAdd,
+      Dkp,
       getDkpPointsFromCache,
-      () => {} // no secondary cache write here
+      cacheSetter
     );
 
     participants.push({ userId, pointChange });
     totalPts += pointChange;
 
+    // 2️⃣ DM the user via your queue
     await sendUserNotification(userToModify, pointChange, userDkp.points, descriptionInput);
   }
 
   if (participants.length) {
+    // 3️⃣ Bulk‐write all transactions
     const bulkOps = createBulkOperations(
       participants,
       guildId,
@@ -249,25 +265,27 @@ async function handleDkpAddRemove(interaction, guildId, isAdd, member) {
     await Dkp.bulkWrite(bulkOps);
     await updateDkpTotal(totalPts, guildId, gameKey);
 
+    // 4️⃣ Refresh caches again after the DB write
     await Promise.all([
       refreshDkpPointsCache(guildId, gameKey),
       refreshEligibleUsersCache(guildId, gameKey),
       refreshDkpRankingCache(guildId, gameKey),
     ]);
 
-    // build and send log once
+    // 5️⃣ Build & send one log embed to the configured “dkp” (log) channel
     const actor = interaction.member.displayName || interaction.user.username;
     const actionLines = participants.map(p =>
       p.pointChange > 0
         ? `Added **${p.pointChange}** DKP to <@${p.userId}>`
         : `Removed **${Math.abs(p.pointChange)}** DKP from <@${p.userId}>`
     );
-    const logDesc = `**${actor}**\n${actionLines.join('\n')}`;
+    const logDesc = `**${actor}**\n${actionLines.join('\n')}` +
+      (descriptionInput ? `\n\nReason: **${descriptionInput}**` : '');
 
     await sendMessageToConfiguredChannels(interaction, logDesc, 'dkp', gameKey);
   }
 
-  // final reply
+  // 6️⃣ Finally, reply with a summary
   const results = participants.map(p =>
     p.pointChange > 0
       ? `Added **${p.pointChange}** DKP to <@${p.userId}>`

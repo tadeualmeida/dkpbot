@@ -56,8 +56,8 @@ async function fetchUserToModify(userID, interaction) {
 }
 
 /**
- * Retorna { pointChange, userDkp }
- * Só tenta escrever em cache se getGuildCache for função.
+ * Returns { pointChange, userDkp }
+ * If getGuildCache is a valid function, writes the updated DKP back into cache.
  */
 async function getUserDkpChanges(
   guildId,
@@ -71,19 +71,19 @@ async function getUserDkpChanges(
 ) {
   let pointChange = isAdd ? pointsToModify : -pointsToModify;
 
-  // busca ou cria registro DKP
+  // Fetch or create the DKP record from the persisted DB via cache
   let userDkp = await getDkpPointsFromCache(guildId, gameKey, userID);
   if (!userDkp) {
     userDkp = await Dkp.create({ guildId, gameKey, userId: userID, points: 0 });
   }
 
-  // não deixa ficar negativo
+  // Prevent going negative
   if (!isAdd && userDkp.points + pointChange < 0) {
     pointChange = -userDkp.points;
   }
   userDkp.points += pointChange;
 
-  // se nos passaram um getGuildCache válido, atualiza o cache
+  // If provided a valid getGuildCache, update the in‐memory cache
   if (typeof getGuildCache === 'function') {
     const cache = getGuildCache(guildId);
     if (cache && typeof cache.set === 'function') {
