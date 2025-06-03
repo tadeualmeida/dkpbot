@@ -10,6 +10,7 @@ const {
   refreshDkpRankingCache,
   getGamesFromCache,
   getDkpMinimumFromCache,
+  getDkpRankingFromCache,
   getGuildCache
 } = require('../utils/cacheManagement');
 
