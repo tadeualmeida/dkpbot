@@ -50,7 +50,7 @@ async function handleAutocomplete(interaction) {
   // 2a) Any 'game' option for listed commands
   if (
     focusedName === 'game' &&
-    ['dkp','rank','dkpadd','dkpremove','bank','config','event','currency','reminder','reset','rankreport']
+    ['dkp','rank','dkpadd','dkpremove','bank','config','event','currency','reminder','reset','rankreport','auction']
       .includes(cmd)
   ) {
     return suggestGames(interaction, guildId, search);
