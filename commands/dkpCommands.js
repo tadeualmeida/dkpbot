@@ -9,9 +9,9 @@ const {
   refreshEligibleUsersCache,
   refreshDkpRankingCache,
   getGamesFromCache,
-  getDkpMinimumFromCache,
+  getGuildCache,
   getDkpRankingFromCache,
-  getGuildCache
+  getDkpMinimumFromCache // ← Added missing import
 } = require('../utils/cacheManagement');
 
 const {
@@ -139,13 +139,17 @@ async function showSingleBalance(interaction, guildId, userId, gameKey) {
 
   const pts         = dkpRec?.points ?? 0;
   const needed      = min - pts;
-  const cfg         = (await getGamesFromCache(guildId)).find(g => g.key === gameKey) || {};
+  const cfgArr      = await getGamesFromCache(guildId);
+  const cfg         = cfgArr.find(g => g.key === gameKey) || {};
   const displayName = cfg.name   || gameKey;
   const currName    = cfg.currency?.name || 'Currency';
 
-  const desc = (min === 0 || pts >= min)
-    ? `You have **${pts}** DKP in **${displayName}**.\nBank: **${bank}** ${currName}.`
-    : `You have **${pts}** DKP in **${displayName}**, below minimum **${min}**, need **${needed}** more.`;
+  let desc;
+  if (min === 0 || pts >= min) {
+    desc = `You have **${pts}** DKP in **${displayName}**.\nBank: **${bank}** ${currName}.`;
+  } else {
+    desc = `You have **${pts}** DKP in **${displayName}**, below minimum **${min}**, need **${needed}** more.`;
+  }
 
   return interaction.editReply({
     embeds: [ createInfoEmbed(`DKP — ${displayName}`, desc) ]
@@ -181,7 +185,8 @@ async function handleDkpRank(interaction, guildId, member, forcedGameKey) {
   const members = await interaction.guild.members.fetch({ user: userIds });
   const nameMap = new Map(members.map(m => [m.user.id, m.displayName]));
 
-  const cfg         = (await getGamesFromCache(guildId)).find(g => g.key === gameKey) || {};
+  const cfgArr      = await getGamesFromCache(guildId);
+  const cfg         = cfgArr.find(g => g.key === gameKey) || {};
   const displayName = cfg.name || gameKey;
 
   const lines = ranking.map((r, idx) => {
