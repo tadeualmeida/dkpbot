@@ -2,6 +2,7 @@
 
 const { loadGuildConfig } = require('./config');
 const { createInfoEmbed } = require('./embeds');
+const { enqueueAction } = require('./messageQueue')
 
 /**
  * Sends a single embed to the configured channel for the given game.
@@ -39,13 +40,14 @@ async function sendMessageToConfiguredChannels(interaction, description, message
     case 'event':    title = 'Event Info';  break;
     case 'crow':     title = 'Crow Info';   break;
     case 'reminder': title = 'Reminder';    break;
+    case 'info':     title = 'Info';        break;
     default:         title = 'Info';
   }
 
-  // 5) send it
-  await channel.send({
-    embeds: [ createInfoEmbed(title, description) ]
-  });
+  const embedPayload = { embeds: [ createInfoEmbed(title, description) ] };
+
+  // Instead of channel.send(embedPayload) directly, enqueue it:
+  enqueueAction(() => channel.send(embedPayload));
 }
 
 module.exports = { sendMessageToConfiguredChannels };

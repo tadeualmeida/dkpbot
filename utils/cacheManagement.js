@@ -3,6 +3,9 @@
 const NodeCache = require('node-cache');
 const Dkp = require('../schema/Dkp');
 const Event = require('../schema/Event');
+const Category = require('../schema/Category');
+const Item = require('../schema/Item');
+const Auction = require('../schema/Auction');
 const { loadGuildConfig } = require('./config');
 
 // In-memory caches per guild
@@ -140,7 +143,7 @@ async function refreshChannelsCache(guildId, gameKey) {
   const cache = getGuildCache(guildId);
   const cfg = await loadGuildConfig(guildId);
   const game = cfg.games.find(g => g.key === gameKey);
-  cache.set(`channels:${gameKey}`, game?.channels || { log: null, reminder: null });
+  cache.set(`channels:${gameKey}`, game?.channels || { log: null, reminder: null, auction: null });
 }
 
 async function getChannelsFromCache(guildId, gameKey) {
@@ -293,6 +296,64 @@ async function removeActiveEventFromCache(guildId, gameKey, eventCode) {
   cache.set(key, list.filter(e => e.code !== eventCode));
 }
 
+// ---- Category caching (per-game) ----
+async function refreshCategoryCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  const categories = await Category.find({ guildId, gameKey }).lean();
+  cache.set(`categories:${gameKey}`, categories);
+}
+
+async function getCategoriesFromCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  const key = `categories:${gameKey}`;
+  let val = cache.get(key);
+  if (!val) {
+    await refreshCategoryCache(guildId, gameKey);
+    val = cache.get(key);
+  }
+  return val;
+}
+
+// ---- Item caching (per-game) ----
+async function refreshItemCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  // Optionally populate category name for convenience
+  const items = await Item.find({ guildId, gameKey })
+    .populate({ path: 'category', select: 'name' })
+    .lean();
+  cache.set(`items:${gameKey}`, items);
+}
+
+async function getItemsFromCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  const key = `items:${gameKey}`;
+  let val = cache.get(key);
+  if (!val) {
+    await refreshItemCache(guildId, gameKey);
+    val = cache.get(key);
+  }
+  return val;
+}
+
+// ---- Auction caching (open auctions only, per-game) ----
+async function refreshOpenAuctionsCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  const auctions = await Auction.find({ guildId, gameKey, status: 'open' }).lean();
+  cache.set(`openAuctions:${gameKey}`, auctions);
+}
+
+async function getOpenAuctionsFromCache(guildId, gameKey) {
+  const cache = getGuildCache(guildId);
+  const key = `openAuctions:${gameKey}`;
+  let val = cache.get(key);
+  if (!val) {
+    await refreshOpenAuctionsCache(guildId, gameKey);
+    val = cache.get(key);
+  }
+  return val;
+}
+
+// ---- Clear entire guild cache ----
 function clearCache(guildId) {
   getGuildCache(guildId).flushAll();
 }
@@ -300,31 +361,65 @@ function clearCache(guildId) {
 module.exports = {
   getGuildCache,
   clearCache,
+
+  // Guild config
   refreshGuildConfigCache,
   getGuildNameFromCache,
   getGamesFromCache,
+
+  // DKP parameters
   refreshDkpParametersCache,
   getDkpParameterFromCache,
+
+  // DKP minimum
   refreshDkpMinimumCache,
   getDkpMinimumFromCache,
+
+  // Event timer
   refreshEventTimerCache,
   getEventTimerFromCache,
+
+  // Currency
   refreshCurrencyCache,
   getCurrencyFromCache,
+
+  // Channels
   refreshChannelsCache,
   getChannelsFromCache,
+
+  // Eligible users
   refreshEligibleUsersCache,
   getEligibleUsersFromCache,
+
+  // DKP points
   refreshDkpPointsCache,
   getDkpPointsFromCache,
+
+  // DKP ranking
   refreshDkpRankingCache,
   getDkpRankingFromCache,
+
+  // Role config
   refreshRoleConfigCache,
   getRoleConfigFromCache,
+
+  // Event caching
   refreshActiveEventsCache,
   getActiveEventsFromCache,
   addParticipantToEventCache,
   getEventParticipantsFromCache,
   clearEventParticipantsCache,
-  removeActiveEventFromCache
+  removeActiveEventFromCache,
+
+  // Category caching
+  refreshCategoryCache,
+  getCategoriesFromCache,
+
+  // Item caching
+  refreshItemCache,
+  getItemsFromCache,
+
+  // Auction caching
+  refreshOpenAuctionsCache,
+  getOpenAuctionsFromCache
 };

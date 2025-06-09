@@ -35,4 +35,12 @@ function formatDuration(ms) {
   return parts.join('');
 }
 
-module.exports = { parseDuration, formatDuration };
+function formatMinutesToString(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h > 0 && m > 0) return `${h}h${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+module.exports = { parseDuration, formatDuration, formatMinutesToString };

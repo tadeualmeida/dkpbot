@@ -31,6 +31,9 @@ const {
 const {
   reminderCommand
 } = require('../slashcommands/reminderSlash');
+const { 
+  transactionsCommand 
+} = require('../slashcommands/transactionsSlash');
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -62,7 +65,10 @@ async function registerCommands(guildId) {
     showHelpCommand,
 
     //Reminder
-    reminderCommand
+    reminderCommand,
+
+    //transactions
+    transactionsCommand
   ].map(cmd => cmd.toJSON());
 
   try {

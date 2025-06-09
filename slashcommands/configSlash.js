@@ -75,7 +75,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // *** UPDATED CHANNEL configuration ***
+  // Channels configuration (inclui agora “auction”)
   .addSubcommand(sub =>
     sub
       .setName('channel')
@@ -90,11 +90,12 @@ const configCommand = new SlashCommandBuilder()
       .addStringOption(opt =>
         opt
           .setName('type')
-          .setDescription('Select the channel purpose')
+          .setDescription('Select the channel type')
           .setRequired(true)
           .addChoices(
             { name: 'Log Channel',      value: 'log' },
-            { name: 'Reminder Channel', value: 'reminder' }
+            { name: 'Reminder Channel', value: 'reminder' },
+            { name: 'Auction Channel',  value: 'auction' }
           )
       )
       .addChannelOption(opt =>
@@ -165,7 +166,10 @@ const configCommand = new SlashCommandBuilder()
             { name: 'Channels',           value: 'channels' },
             { name: 'Minimum Points',     value: 'minimum' },
             { name: 'Event Timer',        value: 'event' },
-            { name: 'Reminder Settings',  value: 'reminder' }
+            { name: 'Reminder Settings',  value: 'reminder' },
+            { name: 'Auction Categories', value: 'categories' },
+            { name: 'Auction Items',      value: 'items' },
+            { name: 'Auction Timer',      value: 'auction' }
           )
       )
   )
@@ -195,6 +199,35 @@ const configCommand = new SlashCommandBuilder()
         opt
           .setName('minutes')
           .setDescription('Enter the timer duration in minutes')
+          .setRequired(true)
+      )
+  )
+
+  // Auction timer settings
+  .addSubcommand(sub =>
+    sub
+      .setName('auction')
+      .setDescription('Manage default auction settings for a specific game')
+      .addStringOption(opt =>
+        opt
+          .setName('game')
+          .setDescription('Select the game to configure')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('action')
+          .setDescription('Choose an action')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Set Auction Timer', value: 'timer' }
+          )
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('duration')
+          .setDescription('Duration (e.g. "1h30m", "90m", "2h")')
           .setRequired(true)
       )
   )
@@ -235,7 +268,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // Guild display name
+  // Set guild display name
   .addSubcommand(sub =>
     sub
       .setName('guildname')
@@ -245,6 +278,103 @@ const configCommand = new SlashCommandBuilder()
           .setName('name')
           .setDescription('Enter the server name')
           .setRequired(true)
+      )
+  )
+
+    // ---- CATEGORY CONFIGURATION ----
+  .addSubcommand(sub =>
+    sub
+      .setName('category')
+      .setDescription('Manage auction categories for a specific game')
+      .addStringOption(opt =>
+        opt
+          .setName('game')
+          .setDescription('Select the game to configure')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('action')
+          .setDescription('Choose an action')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Add Category',    value: 'add' },
+            { name: 'Remove Category', value: 'remove' },
+            { name: 'Edit Category',   value: 'edit' },
+            { name: 'Show Categories', value: 'list' }
+          )
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('name')
+          .setDescription('Category name (for add, remove, or edit)')
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addIntegerOption(opt =>
+        opt
+          .setName('minimumdkp')
+          .setDescription('Minimum DKP required to bid in this category')
+          .setRequired(false)
+      )
+      .addIntegerOption(opt =>
+        opt
+          .setName('minimumcurrency')
+          .setDescription('Minimum in-game currency required to bid in this category')
+          .setRequired(false)
+      )
+      .addIntegerOption(opt =>
+        opt
+          .setName('bid_increment')
+          .setDescription('Minimum bid increment for this category')
+          .setRequired(false)
+      )
+  )
+
+  // ---- ITEM CONFIGURATION ----
+  .addSubcommand(sub =>
+    sub
+      .setName('item')
+      .setDescription('Manage items for a specific game')
+      .addStringOption(opt =>
+        opt
+          .setName('game')
+          .setDescription('Select the game to configure')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('action')
+          .setDescription('Choose an action')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Add Item',    value: 'add' },
+            { name: 'Remove Item', value: 'remove' },
+            { name: 'List Items',  value: 'list' }
+          )
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('name')
+          .setDescription('Item name (for add or remove)')
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('category')
+          .setDescription('Existing category name (for add)')
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('image')
+          .setDescription('Image filename (autocomplete da pasta /img/itens/)')
+          .setRequired(false)
+          .setAutocomplete(true)
       )
   );
 

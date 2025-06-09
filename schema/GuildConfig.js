@@ -24,6 +24,7 @@ const GameConfigSchema = new Schema({
   // canais específicos onde o bot envia mensagens de log e lembrete
   channels: {
     log:      { type: String, default: null },
+    auction:  { type: String, default: null },
     reminder: { type: String, default: null }
   },
   // parâmetros de DKP
@@ -44,6 +45,12 @@ const GameConfigSchema = new Schema({
   currency: {
     name:  { type: String, required: true, trim: true },
     total: { type: Number, default: 0, min: 0 }
+  },
+  // duração padrão (em minutos) para que uma nova auction fique aberta
+  defaultAuctionDuration: {
+    type: Number,
+    default: 16 * 60,     // 16 horas = 960 minutos
+    min: 1
   },
   totalDkp: {
     type: Number,

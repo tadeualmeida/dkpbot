@@ -16,17 +16,27 @@ const {
   createErrorEmbed
 } = require('../utils/embeds');
 const validator = require('validator');
+const { parseDuration } = require('../utils/timeUtils');
+const { sendMessageToConfiguredChannels } = require('../utils/channelUtils');
+
+// Modelos externos de Category e Item
+const Category = require('../schema/Category');
+const Item     = require('../schema/Item');
 
 async function handleConfigCommands(interaction) {
   const guildId = interaction.guildId;
-  const sub = interaction.options.getSubcommand();
+  const sub     = interaction.options.getSubcommand();
 
-  // Load or initialize guild config
+  // Carrega config geral
   const cfg = await loadGuildConfig(guildId);
-
-  // Determine if this subcommand needs a game context
-  const needsGame = ['role','dkp','channel','reminder','show','event'].includes(sub);
   let gameKey, gameCfg;
+
+  // Determinar se o subcomando precisa de game context
+  const needsGame = [
+    'role', 'dkp', 'channel', 'reminder', 'show', 'event', 'auction',
+    'category', 'item'
+  ].includes(sub);
+
   if (needsGame) {
     gameKey = interaction.options.getString('game')?.toLowerCase();
     gameCfg = cfg.games.find(g => g.key === gameKey);
@@ -38,24 +48,22 @@ async function handleConfigCommands(interaction) {
     }
   }
 
-  // Dispatch by subcommand
   switch (sub) {
     // ---- ROLE ----
     case 'role': {
       const group = interaction.options.getString('commandgroup');
       const role  = interaction.options.getRole('role');
-      gameCfg.roles[group] = [role.id];
+      gameCfg.roles[group] = [ role.id ];
       break;
     }
 
     // ---- DKP ----
     case 'dkp': {
-      const action = interaction.options.getString('action');
+      const action  = interaction.options.getString('action');
       const nameOpt = interaction.options.getString('name');
-      const name = nameOpt ? validator.escape(nameOpt.toLowerCase()) : null;
-      const pts  = interaction.options.getInteger('points');
+      const name    = nameOpt ? validator.escape(nameOpt.toLowerCase()) : null;
+      const pts     = interaction.options.getInteger('points');
 
-      // Validation
       if ((action === 'add' || action === 'edit') && (!name || pts == null)) {
         return interaction.reply({
           embeds: [ createErrorEmbed('Name and points are required for add/edit.') ],
@@ -75,7 +83,6 @@ async function handleConfigCommands(interaction) {
         });
       }
 
-      // Modify parameters
       switch (action) {
         case 'add':
         case 'edit': {
@@ -101,8 +108,7 @@ async function handleConfigCommands(interaction) {
 
     // ---- CHANNEL ----
     case 'channel': {
-      // now uses “type” (log | reminder) instead of “action”
-      const type    = interaction.options.getString('type');    // ‘log’ or ‘reminder’
+      const type    = interaction.options.getString('type');    // 'log', 'reminder' ou 'auction'
       const channel = interaction.options.getChannel('channel');
       if (!channel) {
         return interaction.reply({
@@ -110,58 +116,235 @@ async function handleConfigCommands(interaction) {
           ephemeral: true
         });
       }
-
-      // assign to the proper field
-      if (!['log','reminder'].includes(type)) {
+      if (!['log','reminder','auction'].includes(type)) {
         return interaction.reply({
-          embeds: [ createErrorEmbed('Invalid channel type; must be “log” or “reminder”.') ],
+          embeds: [ createErrorEmbed('Invalid channel type; must be "log", "reminder" or "auction".') ],
           ephemeral: true
         });
       }
-
       gameCfg.channels[type] = channel.id;
       break;
     }
 
     // ---- REMINDER ----
     case 'reminder': {
-      const action    = interaction.options.getString('action');      // 'add', 'remove', or 'intervals'
-      const rawParams = interaction.options.getString('parameter');   // e.g. "Fulano, Beturano, Ciclano"
-      const intervals = interaction.options.getString('intervals');   // e.g. "1h,30m,10m"
-
-      // ensure arrays exist
       gameCfg.reminders ||= [];
       gameCfg.reminderIntervals ||= [];
 
+      const action    = interaction.options.getString('action');
+      const rawParams = interaction.options.getString('parameter');
+      const intervals = interaction.options.getString('intervals');
+
       if (action === 'add') {
         if (!rawParams) {
-          return interaction.reply({ embeds: [ createErrorEmbed('Parameter name is required to add.') ], ephemeral: true });
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Parameter name is required to add.') ],
+            ephemeral: true
+          });
         }
-        // **split on commas** and push each trimmed name
         const names = rawParams.split(',').map(s => s.trim()).filter(Boolean);
         names.forEach(name => {
           if (!gameCfg.reminders.includes(name)) {
             gameCfg.reminders.push(name);
           }
         });
-        actionText = `added: ${names.join(', ')}`;
       }
       else if (action === 'remove') {
-        // similarly split & filter
+        if (!rawParams) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Parameter name is required to remove.') ],
+            ephemeral: true
+          });
+        }
         const names = rawParams.split(',').map(s => s.trim()).filter(Boolean);
         gameCfg.reminders = gameCfg.reminders.filter(p => !names.includes(p));
-        actionText = `removed: ${names.join(', ')}`;
       }
       else if (action === 'intervals') {
-        if (!intervals) {
-          return interaction.reply({ embeds: [ createErrorEmbed('Intervals are required for this action.') ], ephemeral: true });
+        if (!rawParams || !intervals) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Parameter and intervals are required.') ],
+            ephemeral: true
+          });
+        }
+        if (!gameCfg.reminders.includes(rawParams.trim())) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed(`Reminder parameter \`${rawParams}\` not found.`) ],
+            ephemeral: true
+          });
         }
         gameCfg.reminderIntervals = intervals.split(',').map(s => s.trim());
-        actionText = `intervals set to: ${gameCfg.reminderIntervals.join(', ')}`;
       } else {
-        return interaction.reply({ embeds: [ createErrorEmbed('Invalid reminder action.') ], ephemeral: true });
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Invalid reminder action.') ],
+          ephemeral: true
+        });
       }
-      
+      break;
+    }
+
+    // ---- CATEGORY ----
+    case 'category': {
+      // ações: add, remove, edit, list
+      const action       = interaction.options.getString('action');
+      const catNameOpt   = interaction.options.getString('name');
+      const catName      = catNameOpt ? validator.escape(catNameOpt.trim()) : null;
+      const minDkp       = interaction.options.getInteger('minimumdkp');
+      const minCurrency  = interaction.options.getInteger('minimumcurrency');
+      const bidIncrement = interaction.options.getInteger('bid_increment');
+
+      switch (action) {
+        case 'add': {
+          if (!catName || minDkp == null || minCurrency == null || bidIncrement == null) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Name, minimum DKP, minimum Currency and increment are all required to add a category.') ],
+              ephemeral: true
+            });
+          }
+          try {
+            await Category.create({
+              guildId,
+              gameKey,
+              name:            catName,
+              minimumDkp:      minDkp,
+              minimumCurrency: minCurrency,
+              bidIncrement
+            });
+          } catch (err) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Error', `Could not create category: ${err.message}`) ],
+              ephemeral: true
+            });
+          }
+          break;
+        }
+        case 'remove': {
+          if (!catName) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Name is required to remove a category.') ],
+              ephemeral: true
+            });
+          }
+          await Category.findOneAndDelete({ guildId, gameKey, name: catName });
+          break;
+        }
+        case 'edit': {
+          if (!catName) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Name is required to edit a category.') ],
+              ephemeral: true
+            });
+          }
+          const updateFields = {};
+          if (minDkp != null)       updateFields.minimumDkp = minDkp;
+          if (minCurrency != null)  updateFields.minimumCurrency = minCurrency;
+          if (bidIncrement != null) updateFields.bidIncrement = bidIncrement;
+          if (Object.keys(updateFields).length === 0) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('At least one of min_dkp, min_currency or increment must be provided to edit.') ],
+              ephemeral: true
+            });
+          }
+          await Category.updateOne(
+            { guildId, gameKey, name: catName },
+            { $set: updateFields }
+          );
+          break;
+        }
+        case 'list': {
+          // apenas criar o embed de listagem, sem persistir nada
+          const cats = await Category.find({ guildId, gameKey }).lean();
+          if (!cats.length) {
+            return interaction.reply({
+              embeds: [ createInfoEmbed('Categories', 'Nenhuma categoria cadastrada.') ],
+              ephemeral: true
+            });
+          }
+          const lines = cats.map(c =>
+            `• **${c.name}** – min DKP: ${c.minimumDkp}, min Currency: ${c.minimumCurrency}, increment: ${c.bidIncrement}`
+          );
+          return interaction.reply({
+            embeds: [ createMultipleResultsEmbed('info', 'Categorias', lines) ],
+            ephemeral: true
+          });
+        }
+        default:
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Invalid category action.') ],
+            ephemeral: true
+          });
+      }
+      break;
+    }
+
+    // ---- ITEM ----
+    case 'item': {
+      // ações: add, remove, list
+      const action     = interaction.options.getString('action');
+      const itemName   = interaction.options.getString('name')?.trim();
+      const categoryOpt= interaction.options.getString('category')?.trim();
+      switch (action) {
+        case 'add': {
+          if (!itemName || !categoryOpt) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Name and category are required to add an item.') ],
+              ephemeral: true
+            });
+          }
+          // encontra o ID da categoria
+          const categoryDoc = await Category.findOne({ guildId, gameKey, name: categoryOpt });
+          if (!categoryDoc) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed(`Category \`${categoryOpt}\` not found.`) ],
+              ephemeral: true
+            });
+          }
+          try {
+            await Item.create({
+              guildId,
+              gameKey,
+              name:     itemName,
+              category: categoryDoc._id
+            });
+          } catch (err) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Error', `Could not create item: ${err.message}`) ],
+              ephemeral: true
+            });
+          }
+          break;
+        }
+        case 'remove': {
+          if (!itemName) {
+            return interaction.reply({
+              embeds: [ createErrorEmbed('Name is required to remove an item.') ],
+              ephemeral: true
+            });
+          }
+          await Item.findOneAndDelete({ guildId, gameKey, name: itemName });
+          break;
+        }
+        case 'list': {
+          const items = await Item.find({ guildId, gameKey }).populate('category', 'name').lean();
+          if (!items.length) {
+            return interaction.reply({
+              embeds: [ createInfoEmbed('Items', 'Nenhum item cadastrado.') ],
+              ephemeral: true
+            });
+          }
+          const lines = items.map(i =>
+            `• **${i.name}** – Categoria: **${i.category.name}**`
+          );
+          return interaction.reply({
+            embeds: [ createMultipleResultsEmbed('info', 'Itens', lines) ],
+            ephemeral: true
+          });
+        }
+        default:
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Invalid item action.') ],
+            ephemeral: true
+          });
+      }
       break;
     }
 
@@ -169,6 +352,7 @@ async function handleConfigCommands(interaction) {
     case 'show': {
       const action = interaction.options.getString('action');
       let embed;
+
       switch (action) {
         case 'parameters':
           embed = createMultipleResultsEmbed(
@@ -181,7 +365,9 @@ async function handleConfigCommands(interaction) {
         case 'channels':
           embed = createInfoEmbed(
             'Channels',
-            `Log: <#${gameCfg.channels.log || 'none'}>\nReminder: <#${gameCfg.channels.reminder || 'none'}>`
+            `Log: <#${gameCfg.channels.log || 'none'}>\n` +
+            `Reminder: <#${gameCfg.channels.reminder || 'none'}>\n` +
+            `Auction: <#${gameCfg.channels.auction || 'none'}>`
           );
           break;
 
@@ -198,6 +384,50 @@ async function handleConfigCommands(interaction) {
             `**${gameCfg.eventTimer || 0}** minutes`
           );
           break;
+
+        case 'auction':
+          {
+            const minutes = gameCfg.defaultAuctionDuration || 0;
+            const hrs  = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            const human= `${hrs > 0 ? `${hrs}h` : ''}${mins > 0 ? `${mins}m` : ''}` || '0m';
+            embed = createInfoEmbed(
+              'Auction Timer',
+              `**${human}** (${minutes} minutes) – default for new auctions`
+            );
+          }
+          break;
+
+        case 'categories': {
+          // lista categoria diretamente do banco
+          const cats = await Category.find({ guildId, gameKey }).lean();
+          if (!cats.length) {
+            return interaction.reply({
+              embeds: [ createInfoEmbed('Categorias', 'Nenhuma categoria cadastrada.') ],
+              ephemeral: true
+            });
+          }
+          const lines = cats.map(c =>
+            `• **${c.name}** – min DKP: ${c.minimumDkp}, min Currency: ${c.minimumCurrency}, increment: ${c.bidIncrement}`
+          );
+          embed = createMultipleResultsEmbed('info', 'Categorias', lines);
+          break;
+        }
+
+        case 'items': {
+          const items = await Item.find({ guildId, gameKey }).populate('category', 'name').lean();
+          if (!items.length) {
+            return interaction.reply({
+              embeds: [ createInfoEmbed('Itens', 'Nenhum item cadastrado.') ],
+              ephemeral: true
+            });
+          }
+          const lines = items.map(i =>
+            `• **${i.name}** – Categoria: **${i.category.name}**`
+          );
+          embed = createMultipleResultsEmbed('info', 'Itens', lines);
+          break;
+        }
 
         case 'reminder': {
           const params = (gameCfg.reminders || [])
@@ -218,7 +448,6 @@ async function handleConfigCommands(interaction) {
             ephemeral: true
           });
       }
-
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
@@ -232,6 +461,51 @@ async function handleConfigCommands(interaction) {
         });
       }
       gameCfg.eventTimer = minutes;
+      break;
+    }
+
+    // ---- AUCTION TIMER ----
+    case 'auction': {
+      const actionStr   = interaction.options.getString('action');    // só 'timer'
+      const durationStr = interaction.options.getString('duration');
+
+      if (actionStr !== 'timer') {
+        return interaction.reply({
+          embeds: [ createErrorEmbed('Invalid auction action.') ],
+          ephemeral: true
+        });
+      }
+
+      const ms = parseDuration(durationStr);
+      if (isNaN(ms) || ms <= 0) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed(
+            'Invalid Duration',
+            `Could not parse duration **${durationStr}**. Use formats como \`1h30m\`, \`90m\`, \`2h\`.`
+          ) ],
+          ephemeral: true
+        });
+      }
+
+      const minutes = Math.floor(ms / 60_000);
+      if (minutes <= 0) {
+        return interaction.reply({
+          embeds: [ createErrorEmbed(
+            'Duration Too Short',
+            `Após parsing, a duração precisa ser pelo menos 1 minuto.`
+          ) ],
+          ephemeral: true
+        });
+      }
+
+      gameCfg.defaultAuctionDuration = minutes;
+
+      await sendMessageToConfiguredChannels(
+        interaction,
+        `🔧 Auction timer para **${gameCfg.name}** atualizado para **${durationStr}** (${minutes} minutos).`,
+        'event',
+        gameKey
+      );
       break;
     }
 
@@ -253,10 +527,11 @@ async function handleConfigCommands(interaction) {
           key,
           name,
           roles: { admin: [], mod: [], user: [] },
-          channels: { log: null, reminder: null },
+          channels: { log: null, reminder: null, auction: null },
           dkpParameters: [],
           minimumPoints: 0,
           eventTimer: 10,
+          defaultAuctionDuration: 960, // 16h
           currency: { name: currency, total: 0 },
           totalDkp: 0,
           reminders: [],
@@ -299,12 +574,11 @@ async function handleConfigCommands(interaction) {
       });
   }
 
-  // Save and refresh cache
+  // Salvar config e invalidar cache
   await cfg.save();
   invalidateGuildConfig(guildId);
-  await refreshGuildConfigCache(guildId);
 
-  // If we updated a specific game, refresh its caches
+  // Se for subcomando que afeta um jogo, atualiza todos os caches relevantes
   if (needsGame) {
     await Promise.all([
       refreshDkpParametersCache(guildId, gameKey),
@@ -312,7 +586,8 @@ async function handleConfigCommands(interaction) {
       refreshEventTimerCache(guildId, gameKey),
       refreshCurrencyCache(guildId, gameKey),
       refreshChannelsCache(guildId, gameKey),
-      refreshRoleConfigCache(guildId, gameKey)
+      refreshRoleConfigCache(guildId, gameKey),
+      refreshGuildConfigCache(guildId)
     ]);
   }
 

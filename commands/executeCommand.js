@@ -9,6 +9,7 @@ const { handleConfigCommands }     = require('./configCommands');
 const { handleReportCommand }      = require('./reportCommands');
 const { handleReminderCommand }      = require('./reminderCommands');
 const { checkRolePermission }      = require('../utils/permissions');
+const { handleTransactionsCommand } = require('../commands/transactionsCommands');
 
 /**
  * A wrapper to centralize error handling for all command handlers.
@@ -52,7 +53,10 @@ const commandHandlers = {
   showhelp:   async (i) => await safeInvoke(handleShowHelpCommand,  i, 'showhelp'),
 
   // ─── Reminder ─────────────────────────────────────────────────────────────────
-  reminder:       async (i) => await safeInvoke(handleReminderCommand,      i, 'reminder'),
+  reminder:   async (i) => await safeInvoke(handleReminderCommand,      i, 'reminder'),
+
+    // ─── transactions ───────────────────────────────────────────────────────────
+  transactions:   async (i) => await safeInvoke(handleTransactionsCommand,      i, 'transactions'),
 };
 
 async function executeCommand(interaction) {
