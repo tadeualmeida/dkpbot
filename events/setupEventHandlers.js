@@ -15,7 +15,10 @@ const {
   refreshEligibleUsersCache,
   refreshDkpRankingCache,
   refreshRoleConfigCache,
-  refreshActiveEventsCache
+  refreshActiveEventsCache,
+  refreshCategoryCache,
+  refreshItemCache,
+  refreshOpenAuctionsCache
 } = require('../utils/cacheManagement');
 const { clearEmptyEvents }         = require('../utils/clearEmptyEvents');
 const {
@@ -25,7 +28,8 @@ const {
 } = require('../utils/guildManagement');
 const GuildConfig                  = require('../schema/GuildConfig');
 const Reminder                     = require('../schema/Reminder');
-const { scheduleReminder }         = require('../utils/reminderScheduler');
+const { bootstrapReminders }         = require('../utils/reminderScheduler');
+const { initAuctionScheduler }         = require('../utils/auctionScheduler');
 
 /**
  * Recarrega todas as caches (por jogo) para uma guild
@@ -48,6 +52,9 @@ async function refreshAllCaches(guildId) {
         refreshDkpRankingCache(guildId, key),
         refreshRoleConfigCache(guildId, key),
         refreshActiveEventsCache(guildId, key),
+        refreshCategoryCache(guildId, key),
+        refreshItemCache(guildId, key),
+        refreshOpenAuctionsCache(guildId, key),
       ]);
     })
   );
@@ -63,43 +70,6 @@ async function ensureGuildConfigExists(guildId) {
     const newCfg = new GuildConfig({ guildId, guildName: 'GuildName' });
     await newCfg.save();
     console.log(`Created new GuildConfig for guild: ${guildId}`);
-  }
-}
-
-/**
- * Reagenda todos os reminders persistidos no Mongo,
- * removendo imediatamente os que já expiraram.
- *
- * @param {import('discord.js').Client} client — instância do Discord.Client
- */
-async function bootstrapReminders(client) {
-  const now = new Date();
-
-  // Busca **todos** os reminders
-  const all = await Reminder.find({}).lean();
-
-  for (const rem of all) {
-    // Se já expirou, remove do banco
-    if (rem.targetTimestamp <= now) {
-      await Reminder.deleteOne({ _id: rem._id });
-      console.log(`[REMINDER] Expired reminder ${rem._id} removed from DB`);
-      continue;
-    }
-
-    // Senão, reagenda
-    try {
-      scheduleReminder(
-        rem.guildId,
-        rem.gameKey,
-        rem.parameterName,
-        rem.intervals,
-        rem.targetTimestamp,
-        { client, guildId: rem.guildId }
-      );
-      console.log(`[REMINDER] Bootstrapped reminder ${rem._id} for parameter "${rem.parameterName}"`);
-    } catch (err) {
-      console.error(`[REMINDER] Failed to bootstrap reminder ${rem._id}:`, err);
-    }
   }
 }
 
@@ -126,6 +96,9 @@ function setupEventHandlers(client) {
 
     // Reagendar reminders persistidos
     await bootstrapReminders(client);
+
+    // Reagendar acution abertas
+    await initAuctionScheduler(client);
 
     // Verifica guilds órfãos
     await checkForOrphanedGuilds(client);

@@ -32,6 +32,12 @@ const {
   reminderCommand
 } = require('../slashcommands/reminderSlash');
 const { 
+  auctionCommand 
+} = require('../slashcommands/auctionSlash');
+const { 
+  bidCommand 
+} = require('../slashcommands/bidSlash');
+const { 
   transactionsCommand 
 } = require('../slashcommands/transactionsSlash');
 
@@ -66,6 +72,10 @@ async function registerCommands(guildId) {
 
     //Reminder
     reminderCommand,
+
+    //Auctions
+    auctionCommand,
+    bidCommand,
 
     //transactions
     transactionsCommand

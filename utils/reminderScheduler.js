@@ -9,6 +9,43 @@ const { parseDuration } = require('./timeUtils');
 const scheduledReminders = new Map();
 
 /**
+ * Reagenda todos os reminders persistidos no Mongo,
+ * removendo imediatamente os que já expiraram.
+ *
+ * @param {import('discord.js').Client} client — instância do Discord.Client
+ */
+async function bootstrapReminders(client) {
+  const now = new Date();
+
+  // Busca **todos** os reminders
+  const all = await Reminder.find({}).lean();
+
+  for (const rem of all) {
+    // Se já expirou, remove do banco
+    if (rem.targetTimestamp <= now) {
+      await Reminder.deleteOne({ _id: rem._id });
+      console.log(`[REMINDER] Expired reminder ${rem._id} removed from DB`);
+      continue;
+    }
+
+    // Senão, reagenda
+    try {
+      scheduleReminder(
+        rem.guildId,
+        rem.gameKey,
+        rem.parameterName,
+        rem.intervals,
+        rem.targetTimestamp,
+        { client, guildId: rem.guildId }
+      );
+      console.log(`[REMINDER] Bootstrapped reminder ${rem._id} for parameter "${rem.parameterName}"`);
+    } catch (err) {
+      console.error(`[REMINDER] Failed to bootstrap reminder ${rem._id}:`, err);
+    }
+  }
+}
+
+/**
  * Schedule reminders at specified intervals before a target time,
  * and persist them to the database.
  *
@@ -123,5 +160,6 @@ async function cancelScheduledReminder(guildId, gameKey, parameterName) {
 
 module.exports = {
   scheduleReminder,
-  cancelScheduledReminder
+  cancelScheduledReminder,
+  bootstrapReminders
 };

@@ -1,4 +1,4 @@
-// schema/Auction.js
+// File: schema/Auction.js
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
@@ -25,6 +25,12 @@ const AuctionSchema = new Schema({
     required: true,
     min: 0
   },
+  // ← campo que faltava
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
   // timestamps de início e fim do leilão
   startTimestamp: {
     type: Date,
@@ -35,17 +41,30 @@ const AuctionSchema = new Schema({
     required: true,
     index: true
   },
+  // ids de mensagem e thread no Discord
+  messageId: {
+    type: String,
+    default: null
+  },
+  threadId: {
+    type: String,
+    default: null
+  },
   status: {
     type: String,
     enum: ['open', 'closed'],
     default: 'open'
+  },
+  announcementMessageId: {
+    type: String,
+    default: null
   }
 }, { timestamps: true });
 
-// Garante que só exista um leilão “open” para este guild+game+item
-AuctionSchema.index(
-  { guildId: 1, gameKey: 1, item: 1, status: 1 },
-  { unique: true, partialFilterExpression: { status: 'open' } }
-);
+// REMOVED: unique partial index on item, to allow multiple concurrent auctions of the same item
+// AuctionSchema.index(
+//   { guildId: 1, gameKey: 1, item: 1, status: 1 },
+//   { unique: true, partialFilterExpression: { status: 'open' } }
+// );
 
 module.exports = mongoose.model('Auction', AuctionSchema);

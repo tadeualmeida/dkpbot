@@ -24,7 +24,7 @@ const ItemSchema = new Schema({
     ref: 'Category',
     required: true
   },
-  // Nome do arquivo da imagem (ex: "sword.png"), deverá estar em /img/itens/
+  // Nome do arquivo da imagem (ex: "sword.png"), deverá estar em /img/items/
   image: {
     type: String,
     default: null,

@@ -10,6 +10,8 @@ const { handleReportCommand }      = require('./reportCommands');
 const { handleReminderCommand }      = require('./reminderCommands');
 const { checkRolePermission }      = require('../utils/permissions');
 const { handleTransactionsCommand } = require('../commands/transactionsCommands');
+const { handleAuctionCommand } = require('../commands/auctionCommands');
+const { handleBidCommand } = require('../commands/bidCommands');
 
 /**
  * A wrapper to centralize error handling for all command handlers.
@@ -55,7 +57,11 @@ const commandHandlers = {
   // ─── Reminder ─────────────────────────────────────────────────────────────────
   reminder:   async (i) => await safeInvoke(handleReminderCommand,      i, 'reminder'),
 
-    // ─── transactions ───────────────────────────────────────────────────────────
+  // ─── Auction Management ───────────────────────────────────────────────────────────
+  auction:    async (i) => await safeInvoke(handleAuctionCommand,      i, 'auction'),
+  bid:        async (i) => await safeInvoke(handleBidCommand,      i, 'auction'), 
+
+  // ─── Transactions ───────────────────────────────────────────────────────────
   transactions:   async (i) => await safeInvoke(handleTransactionsCommand,      i, 'transactions'),
 };
 

@@ -5,7 +5,7 @@ const reminderCommand = new SlashCommandBuilder()
   .setName('reminder')
   .setDescription('Set a countdown reminder for a game parameter')
 
-  // 1️⃣ Which game’s reminders?
+  // Which game’s reminders?
   .addStringOption(opt =>
     opt
       .setName('game')
@@ -14,7 +14,7 @@ const reminderCommand = new SlashCommandBuilder()
       .setAutocomplete(true)
   )
 
-  // 2️⃣ Which parameter within that game?
+  // Which parameter within that game?
   .addStringOption(opt =>
     opt
       .setName('parameter')
@@ -23,7 +23,7 @@ const reminderCommand = new SlashCommandBuilder()
       .setAutocomplete(true)
   )
 
-  // 3️⃣ How long until the reminder?
+  // How long until the reminder?
   .addStringOption(opt =>
     opt
       .setName('time')

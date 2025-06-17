@@ -11,7 +11,7 @@ const {
   removeActiveEventFromCache
 } = require('./cacheManagement');
 const { sendMessageToConfiguredChannels } = require('./channelUtils');
-const { createBulkOperations, updateDkpTotal } = require('./generalUtils');
+const { createBulkOperations, updateDkpTotal, getGameName } = require('./generalUtils');
 const Dkp   = require('../schema/Dkp');
 const Event = require('../schema/Event');
 
@@ -101,10 +101,11 @@ async function processEventEnd(guildId, gameKey, eventCode, parameterName, inter
   }
 
   // 7) Send end-of-event log
+  const gameName = await getGameName(guildId, gameKey);
   const mentions = participants.map(p => p.username).join('**, **') || 'No participants.';
   await sendMessageToConfiguredChannels(
     interaction,
-    `Event **${eventCode}** for **${gameKey}** ended (param **${parameterName}**).\nParticipants (${participants.length}): **${mentions}**`,
+    `Event **${eventCode}** for **${gameName}** ended (Parameter **${parameterName}**).\nParticipants (${participants.length}): **${mentions}**`,
     'event',
     gameKey
   );

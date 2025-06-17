@@ -9,17 +9,19 @@ const commandGroups = {
     'dkp',
     'rank',
     'join',
-    'help'
+    'help',
+    'bid'
   ],
   moderators: [
     'event',
     'showhelp',
-    'reminder'
+    'reminder',
+    'auction'
   ],
   administrators: [
     'dkpadd',
     'dkpremopve',
-    'addcrow',
+    'currency',
     'removecrow',
     'reset',
     'rankreport',

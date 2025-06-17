@@ -56,7 +56,6 @@ async function refreshDkpParametersCache(guildId, gameKey) {
   game.dkpParameters.forEach(p => {
     cache.set(`dkpParameter:${gameKey}:${p.name}`, { name: p.name, points: p.points });
   });
-  // remove stale
   cache.keys()
     .filter(k => k.startsWith(`dkpParameter:${gameKey}:`))
     .forEach(k => {
@@ -317,9 +316,9 @@ async function getCategoriesFromCache(guildId, gameKey) {
 // ---- Item caching (per-game) ----
 async function refreshItemCache(guildId, gameKey) {
   const cache = getGuildCache(guildId);
-  // Optionally populate category name for convenience
+  // Populate full category document for each item
   const items = await Item.find({ guildId, gameKey })
-    .populate({ path: 'category', select: 'name' })
+    .populate('category')
     .lean();
   cache.set(`items:${gameKey}`, items);
 }

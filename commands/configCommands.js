@@ -8,6 +8,8 @@ const {
   refreshCurrencyCache,
   refreshChannelsCache,
   refreshRoleConfigCache,
+  refreshItemCache,
+  refreshCategoryCache,
   refreshGuildConfigCache
 } = require('../utils/cacheManagement');
 const {
@@ -282,6 +284,7 @@ async function handleConfigCommands(interaction) {
       const action     = interaction.options.getString('action');
       const itemName   = interaction.options.getString('name')?.trim();
       const categoryOpt= interaction.options.getString('category')?.trim();
+      const image      = interaction.options.getString('image')?.trim();;
       switch (action) {
         case 'add': {
           if (!itemName || !categoryOpt) {
@@ -303,7 +306,8 @@ async function handleConfigCommands(interaction) {
               guildId,
               gameKey,
               name:     itemName,
-              category: categoryDoc._id
+              category: categoryDoc._id,
+              image
             });
           } catch (err) {
             return interaction.reply({
@@ -320,9 +324,15 @@ async function handleConfigCommands(interaction) {
               ephemeral: true
             });
           }
-          await Item.findOneAndDelete({ guildId, gameKey, name: itemName });
-          break;
-        }
+          const itemDoc = await Item.findOneAndDelete({ guildId, gameKey, _id: itemName });
+          if (!itemDoc) {
+            return interaction.reply({ content: `Item **${itemName}** não encontrado.`, ephemeral: true });
+          }
+          return interaction.reply({
+            content: `Item **${itemName}** removido com sucesso.`,
+            ephemeral: true
+          });
+    }
         case 'list': {
           const items = await Item.find({ guildId, gameKey }).populate('category', 'name').lean();
           if (!items.length) {
@@ -587,6 +597,8 @@ async function handleConfigCommands(interaction) {
       refreshCurrencyCache(guildId, gameKey),
       refreshChannelsCache(guildId, gameKey),
       refreshRoleConfigCache(guildId, gameKey),
+      refreshItemCache(guildId, gameKey),
+      refreshCategoryCache(guildId, gameKey),
       refreshGuildConfigCache(guildId)
     ]);
   }

@@ -52,6 +52,12 @@ const GameConfigSchema = new Schema({
     default: 16 * 60,     // 16 horas = 960 minutos
     min: 1
   },
+    // duração padrão (em minutos) para que uma nova auction fique aberta
+  defaultAuctionDelete: {
+    type: Number,
+    default: 6 * 60,     // 6 horas = 960 minutos
+    min: 1
+  },
   totalDkp: {
     type: Number,
     default: 0,
