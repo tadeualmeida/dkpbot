@@ -103,7 +103,7 @@ async function handleAuctionCommand(interaction) {
         gameKey
       );
 
-      const annMsg = await channel.send(`📢 New auction started: **${item.name}** x${quantity}!`);
+      const annMsg = await channel.send(`@here 📢 New auction started: **${item.name}** x${quantity}!`);
       const thread = await annMsg.startThread({ name: `Auction: ${item.name}` });
 
       const imagePath = path.join(__dirname, '..', 'img', 'items', item.image);
