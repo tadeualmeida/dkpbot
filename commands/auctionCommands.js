@@ -7,6 +7,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require('discord.js');
+const { parseDuration } = require('../utils/timeUtils');
 const Auction = require('../schema/Auction');
 const AuctionHistory = require('../schema/AuctionHistory');
 const Bid = require('../schema/Bid');
@@ -126,44 +127,75 @@ async function handleAuctionCommand(interaction) {
 
     // ─── EDIT ───
     if (sub === 'edit') {
-      const auctionId   = interaction.options.getString('auctionid');
-      const newQuantity = interaction.options.getInteger('quantity');
-      const newDuration = interaction.options.getInteger('duration');
+      const auctionId    = interaction.options.getString('auctionid');
+      const newQty       = interaction.options.getInteger('quantity');
+      const rawDuration  = interaction.options.getString('duration');
 
-      if (newQuantity == null && newDuration == null) {
-        return interaction.editReply({
-          content: 'You must provide a new quantity and/or a new duration.'
-        });
+      if (newQty == null && !rawDuration) {
+        return interaction.editReply(
+          'You must supply a new **quantity** and/or **duration**.'
+        );
       }
 
-      const auction = await Auction.findOne({ _id: auctionId, gameKey });
+      // Fetch & validate auction
+      const auction = await Auction.findById(auctionId);
       if (!auction || auction.status !== 'open') {
-        return interaction.editReply({ content: 'Open auction not found for that ID.' });
+        return interaction.editReply('Open auction not found for that ID.');
       }
 
-      const updates = [];
-      if (newQuantity != null) {
-        auction.quantity = newQuantity;
-        updates.push(`quantity → ${newQuantity}`);
+      // Apply changes
+      const changes = [];
+      if (newQty != null) {
+        auction.quantity = newQty;
+        changes.push(`quantity → ${newQty}`);
       }
-      if (newDuration != null) {
-        auction.endTimestamp = new Date(Date.now() + newDuration * 60000);
-        updates.push(`duration → ${newDuration}m`);
+      if (rawDuration) {
+        const ms = parseDuration(rawDuration);
+        if (isNaN(ms) || ms <= 0) {
+          return interaction.editReply(
+            'Could not parse duration. Use formats like `10h30m`, `45m`, `2h`.'
+          );
+        }
+        auction.endTimestamp = new Date(Date.now() + ms);
+        changes.push(`duration → ${rawDuration}`);
+
+        // cancel existing scheduled close if any
+        const jobName = `close-auction-${auction._id}`;
+        const existingJob = schedule.scheduledJobs[jobName];
+        if (existingJob) existingJob.cancel();
+
+        // schedule with new timestamp
+        scheduleAuctionClose(auction, interaction.client);
       }
 
       await auction.save();
       await refreshOpenAuctionsCache(guildId, gameKey);
-      if (newDuration != null) scheduleAuctionClose(auction, interaction.client);
-
-      const parent = await interaction.guild.channels.fetch(channelId).catch(() => null);
-      if (parent?.threads) {
-        const thr = await parent.threads.fetch(auction.threadId).catch(() => null);
-        if (thr) thr.send(`Auction updated: ${updates.join(', ')}`);
+      if (rawDuration) {
+        scheduleAuctionClose(auction, interaction.client);
       }
 
-      return interaction.editReply({
-        content: `Auction **${auctionId}** updated: ${updates.join(', ')}`
-      });
+      // **Update the embed inside the existing thread**
+      const items = await getItemsFromCache(guildId, gameKey);
+      const item  = items.find(i => i._id.equals(auction.item));
+      const thread = await interaction.client.channels.fetch(auction.threadId);
+      if (thread?.isThread()) {
+        // fetch last 10 messages, find the one with our embed footer
+        const msgs = await thread.messages.fetch({ limit: 10 });
+        const orig = msgs.find(m =>
+          m.embeds[0]?.footer?.text?.includes(auction._id)
+        );
+        if (orig) {
+          const updatedEmbed = buildEmbed(auction, item, auction.quantity)
+            .setImage(orig.embeds[0].image?.url);
+          await orig.edit({ embeds: [updatedEmbed] });
+        }
+        // Optionally notify of the change
+        await thread.send(`⚙️ Auction updated: ${changes.join(', ')}`);
+      }
+
+      return interaction.editReply(
+        `Auction **${auctionId}** updated: ${changes.join(', ')}`
+      );
     }
 
     // ─── END ───
@@ -322,6 +354,49 @@ async function handleAuctionCommand(interaction) {
         content: 'Auction ended, history recorded and DKP updated.'
       });
     }
+      // ─── CANCEL ───────────────────────────────────────────────────────────────────
+    if (sub === 'cancel') {
+      const auctionId = interaction.options.getString('auctionid');
+      const auction   = await Auction.findOne({ _id: auctionId, gameKey });
+      if (!auction || auction.status !== 'open') {
+        return interaction.editReply({ content: 'Open auction not found for that ID.' });
+      }
+
+      // Delete announcement message
+      if (auction.announcementMessageId) {
+        const annMsg = await channel.messages
+          .fetch(auction.announcementMessageId)
+          .catch(() => null);
+        if (annMsg) {
+          await annMsg.delete().catch(() => null);
+        }
+      }
+
+      // Delete the thread
+      const thread = await interaction.client.channels.fetch(auction.threadId).catch(() => null);
+      if (thread) {
+        await thread.delete().catch(() => null);
+      }
+
+      // Remove auction entirely
+      await Auction.deleteOne({ _id: auctionId });
+
+      // Refresh cache
+      await refreshOpenAuctionsCache(guildId, gameKey);
+
+      // Log cancellation
+      await sendMessageToConfiguredChannels(
+        interaction,
+        `Auction **${auctionId}** cancelled by **${interaction.member.displayName}**.`,
+        'log',
+        gameKey
+      );
+
+      return interaction.editReply({
+        content: `Auction **${auctionId}** has been cancelled and removed.`
+      });
+    }
+
   } catch (err) {
     console.error('Error handling auction command:', err);
     return interaction.editReply({ content: 'Error processing auction.' });

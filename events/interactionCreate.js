@@ -71,7 +71,7 @@ async function handleAutocomplete(interaction) {
   // ---- /auction autocomplete ----
   if (cmd === 'auction') {
     // game option
-    if ((sub === 'start' || sub === 'edit' || sub === 'end') && focusedName === 'game') {
+    if ((sub === 'start' || sub === 'edit' || sub === 'end' || sub === 'cancel') && focusedName === 'game') {
       return suggestGames(interaction, guildId, search);
     }
     // start: item and quantity
@@ -109,7 +109,7 @@ async function handleAutocomplete(interaction) {
       }
     }
     // end: auctionid
-    if (sub === 'end' && focusedName === 'auctionid') {
+    if ((sub === 'end' || sub === 'cancel') && focusedName === 'auctionid') {
       const openAuctions = await getOpenAuctionsFromCache(guildId, gameKey);
       const items         = await getItemsFromCache(guildId, gameKey);
       const choices = openAuctions

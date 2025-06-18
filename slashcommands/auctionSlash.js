@@ -1,11 +1,12 @@
 // File: slashcommands/auctionSlash.js
+
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const auctionCommand = new SlashCommandBuilder()
   .setName('auction')
-  .setDescription('Manage auctions')
+  .setDescription('Manage DKP auctions')
 
-  // Start a new auction
+// ─── START ──────────────────────────────────────────────────────────────────────
   .addSubcommand(sub =>
     sub
       .setName('start')
@@ -13,30 +14,30 @@ const auctionCommand = new SlashCommandBuilder()
       .addStringOption(opt =>
         opt
           .setName('game')
-          .setDescription('Select the game')
+          .setDescription('Select the game to use')
           .setRequired(true)
           .setAutocomplete(true)
       )
       .addStringOption(opt =>
         opt
           .setName('item')
-          .setDescription('Item to auction')
+          .setDescription('Select an item to auction')
           .setRequired(true)
           .setAutocomplete(true)
       )
       .addIntegerOption(opt =>
         opt
           .setName('quantity')
-          .setDescription('Number of items in this auction')
+          .setDescription('Number of items available in this auction')
           .setRequired(true)
       )
   )
 
-  // Edit quantity or duration of an existing auction
+// ─── EDIT ───────────────────────────────────────────────────────────────────────
   .addSubcommand(sub =>
     sub
       .setName('edit')
-      .setDescription('Edit quantity or duration of an existing auction')
+      .setDescription('Edit an existing open auction')
       .addStringOption(opt =>
         opt
           .setName('game')
@@ -47,29 +48,29 @@ const auctionCommand = new SlashCommandBuilder()
       .addStringOption(opt =>
         opt
           .setName('auctionid')
-          .setDescription('ID of the auction')
+          .setDescription('ID of the auction to edit')
           .setRequired(true)
           .setAutocomplete(true)
       )
       .addIntegerOption(opt =>
         opt
           .setName('quantity')
-          .setDescription('New quantity of items')
+          .setDescription('New quantity (optional)')
           .setRequired(false)
       )
-      .addIntegerOption(opt =>
+      .addStringOption(opt =>
         opt
           .setName('duration')
-          .setDescription('New duration in minutes')
+          .setDescription('New duration (e.g. 10h30m, 2h, 45m). Optional')
           .setRequired(false)
       )
   )
 
-  // End an auction manually
+// ─── END ────────────────────────────────────────────────────────────────────────
   .addSubcommand(sub =>
     sub
       .setName('end')
-      .setDescription('End an auction manually')
+      .setDescription('Manually end an auction immediately')
       .addStringOption(opt =>
         opt
           .setName('game')
@@ -80,7 +81,28 @@ const auctionCommand = new SlashCommandBuilder()
       .addStringOption(opt =>
         opt
           .setName('auctionid')
-          .setDescription('ID of the auction')
+          .setDescription('ID of the auction to end')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+  )
+
+// ─── CANCEL ─────────────────────────────────────────────────────────────────────
+  .addSubcommand(sub =>
+    sub
+      .setName('cancel')
+      .setDescription('Cancel and remove an auction (deletes thread and announcement)')
+      .addStringOption(opt =>
+        opt
+          .setName('game')
+          .setDescription('Select the game')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('auctionid')
+          .setDescription('ID of the auction to cancel')
           .setRequired(true)
           .setAutocomplete(true)
       )
