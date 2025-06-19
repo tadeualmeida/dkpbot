@@ -200,7 +200,7 @@ async function initAuctionScheduler(client) {
     scheduleAuctionClose(auc, client);
   }
 
-  // closed auctions → delete if due or schedule later
+  // closed auctions → delete if due or schedule later 
   const closedAuctions = await Auction.find({
     status:       'closed',
     endTimestamp: { $lte: now }
