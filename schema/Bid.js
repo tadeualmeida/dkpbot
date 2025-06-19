@@ -24,6 +24,10 @@ const BidSchema = new Schema({
     required: true,
     index: true
   },
+  displayName: { 
+    type: String,
+    required: true
+  },
   amount: {
     type: Number,
     required: true,

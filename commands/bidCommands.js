@@ -88,12 +88,13 @@ async function handleBidCommand(interaction) {
   // Keep previous highest bid to notify later
   const previousHighest = highest;
 
-  // 4️⃣ Record the new bid
+  // 4️⃣ Record the new bid 
   await Bid.create({
     guildId,
     gameKey:  auction.gameKey,
     auction:  auction._id,
     userId,
+    displayName:  interaction.member.displayName,
     amount:   value,
     placedAt: new Date()
   });

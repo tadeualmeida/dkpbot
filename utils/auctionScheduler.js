@@ -136,26 +136,25 @@ async function closeAuction(auctionId, client) {
 
   // log to game’s log channel
   if (gameCfg.channels.log && winnerBid && oldBalance !== null && newBalance !== null) {
-    const logChannel = await client.channels.fetch(gameCfg.channels.log).catch(() => null);
-    if (logChannel?.isTextBased()) {
-      let displayName = 'Unknown';
-      try {
-        const guild  = await interaction.client.guilds.fetch(guildId);
-        const member = await guild.members.fetch(winnerBid.userId);
-        displayName  = member.displayName;
-      } catch {}
-      const cost = auction.quantity * auction.item.category.minimumDkp;
-      const embed = createInfoEmbed(
-        'Auction Ended',
-        `Item: **${auction.item.name}** x${auction.quantity}\n` +
-        `Winner: **${displayName}**\n` +
-        `Cost: **${cost}** DKP\n` +
-        `Balance: **${oldBalance}** → **${newBalance}** DKP\n\n` +
-        `Auction thread: ${threadUrl}`
-      );
-      await logChannel.send({ embeds: [embed] });
-    }
+  const logChannel = await interaction.client.channels
+    .fetch(gameCfg.channels.log)
+    .catch(() => null);
+
+  if (logChannel?.isTextBased()) {
+    // agora pegamos direto do bid
+    const displayName = winnerBid.displayName ?? winnerBid.userId;
+    const cost        = auction.quantity * auction.item.category.minimumDkp;
+    const embed       = createInfoEmbed(
+      'Auction Ended',
+      `Item: **${auction.item.name}** x${auction.quantity}\n` +
+      `Winner: **${displayName}**\n` +
+      `Cost: **${cost}** DKP\n` +
+      `Balance: **${oldBalance}** → **${newBalance}** DKP\n\n` +
+      `Auction thread: ${threadUrl}`
+    );
+    await logChannel.send({ embeds: [embed] });
   }
+}
 
   // finalize
   auction.status       = 'closed';
@@ -178,7 +177,7 @@ function scheduleAuctionClose(auction, client) {
   );
 
   // auto‐delete 6h later
-  const deleteTime = new Date(auction.endTimestamp.getTime() + 6 * 60 * 60 * 1000);
+  const deleteTime = new Date(auction.endTimestamp.getTime() + 2 * 60 * 1000);
   schedule.scheduleJob(
     `delete-auction-${auction._id}`,
     deleteTime,
@@ -209,7 +208,7 @@ async function initAuctionScheduler(client) {
     endTimestamp: { $lte: now }
   });
   for (const auc of closedAuctions) {
-    const deleteTime = new Date(auc.endTimestamp.getTime() + 6 * 60 * 60 * 1000);
+    const deleteTime = new Date(auc.endTimestamp.getTime() + 2 * 60 * 1000);
     if (deleteTime <= now) {
       await deleteAnnouncementAndThread(auc._id, client);
     } else {

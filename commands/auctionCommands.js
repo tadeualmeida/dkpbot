@@ -7,6 +7,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require('discord.js');
+const schedule = require('node-schedule');
 const { parseDuration } = require('../utils/timeUtils');
 const Auction = require('../schema/Auction');
 const AuctionHistory = require('../schema/AuctionHistory');
@@ -175,21 +176,33 @@ async function handleAuctionCommand(interaction) {
       }
 
       // **Update the embed inside the existing thread**
-      const items = await getItemsFromCache(guildId, gameKey);
-      const item  = items.find(i => i._id.equals(auction.item));
+      const items  = await getItemsFromCache(guildId, gameKey);
+      const item   = items.find(i => i._id.equals(auction.item));
       const thread = await interaction.client.channels.fetch(auction.threadId);
+
       if (thread?.isThread()) {
-        // fetch last 10 messages, find the one with our embed footer
+        // 1️⃣ find the original embed message by footer
         const msgs = await thread.messages.fetch({ limit: 10 });
         const orig = msgs.find(m =>
-          m.embeds[0]?.footer?.text?.includes(auction._id)
+          m.embeds[0]?.footer?.text?.includes(auction._id.toString())
         );
+
         if (orig) {
-          const updatedEmbed = buildEmbed(auction, item, auction.quantity)
-            .setImage(orig.embeds[0].image?.url);
-          await orig.edit({ embeds: [updatedEmbed] });
+          // 2️⃣ delete that old message (embed + stray attachment)
+          await orig.delete().catch(() => null);
+
+          // 3️⃣ build & send new embed with its image attached
+          const imagePath = path.join(__dirname, '..', 'img', 'items', item.image);
+          const newEmbed  = buildEmbed(auction, item, auction.quantity)
+            .setImage(`attachment://${item.image}`);
+
+          await thread.send({
+            embeds: [newEmbed],
+            files:  [{ attachment: imagePath, name: item.image }]
+          });
         }
-        // Optionally notify of the change
+
+        // 4️⃣ option- al status update
         await thread.send(`⚙️ Auction updated: ${changes.join(', ')}`);
       }
 
