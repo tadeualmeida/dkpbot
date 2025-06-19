@@ -135,10 +135,8 @@ async function closeAuction(auctionId, client) {
   }
 
   // log to game’s log channel
-  if (gameCfg.channels.log && winnerBid && oldBalance !== null && newBalance !== null) {
-  const logChannel = await interaction.client.channels
-    .fetch(gameCfg.channels.log)
-    .catch(() => null);
+if (gameCfg.channels.log && winnerBid && oldBalance !== null && newBalance !== null) {
+  const logChannel = await client.channels.fetch(gameCfg.channels.log).catch(() => null);
 
   if (logChannel?.isTextBased()) {
     // agora pegamos direto do bid
@@ -177,7 +175,7 @@ function scheduleAuctionClose(auction, client) {
   );
 
   // auto‐delete 6h later
-  const deleteTime = new Date(auction.endTimestamp.getTime() + 6 * 60 * 60 * 1000);
+  const deleteTime = new Date(auction.endTimestamp.getTime() + 2 * 60 * 1000);
   schedule.scheduleJob(
     `delete-auction-${auction._id}`,
     deleteTime,
@@ -208,7 +206,7 @@ async function initAuctionScheduler(client) {
     endTimestamp: { $lte: now }
   });
   for (const auc of closedAuctions) {
-    const deleteTime = new Date(auc.endTimestamp.getTime() + 6 * 60 * 60 * 1000);
+    const deleteTime = new Date(auc.endTimestamp.getTime() + 2 * 60 * 1000);
     if (deleteTime <= now) {
       await deleteAnnouncementAndThread(auc._id, client);
     } else {
