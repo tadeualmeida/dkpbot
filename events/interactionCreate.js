@@ -71,7 +71,7 @@ async function handleAutocomplete(interaction) {
   // ---- /auction autocomplete ----
   if (cmd === 'auction') {
     // game option
-    if ((sub === 'start' || sub === 'edit' || sub === 'end' || sub === 'cancel') && focusedName === 'game') {
+    if ((sub === 'start' || sub === 'edit' || sub === 'end' || sub === 'cancel' || sub === 'history') && focusedName === 'game') {
       return suggestGames(interaction, guildId, search);
     }
     // start: item and quantity

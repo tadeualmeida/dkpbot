@@ -414,6 +414,47 @@ async function handleAuctionCommand(interaction) {
     console.error('Error handling auction command:', err);
     return interaction.editReply({ content: 'Error processing auction.' });
   }
+
+  // ─── HISTORY ────────────────────────────────────────────────────────────────
+  if (sub === 'history') {
+    // 1) compute cutoff
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // 2) fetch last 24h history, but only for this guild+game
+    const raw = await AuctionHistory.find({ closedAt: { $gte: since } })
+      .populate({
+        path: 'auctionId',
+        match: { guildId, gameKey }
+      })
+      .sort({ closedAt: -1 })
+      .limit(10)
+      .lean();
+
+    // 3) filter out any that didn't match our guild/game
+    const list = raw.filter(h => h.auctionId);
+
+    if (list.length === 0) {
+      return interaction.editReply('No auctions closed in the last 24 hours.');
+    }
+
+    // 4) build embed
+    const embed = {
+      title: `Auction History (last 24 h for ${gameKey})`,
+      fields: list.map(h => {
+        const ts = Math.floor(new Date(h.closedAt).getTime() / 1000);
+        // winnerUserId is already saved on history
+        return {
+          name: `${h.itemName}`,
+          value:
+            `Winner: <@${h.winnerUserId}>\n` +
+            `Amount: **${h.winningAmount}**\n` +
+            `Closed: <t:${ts}:f>`
+        };
+      })
+    };
+
+    return interaction.editReply({ embeds: [embed] });
+  }
 }
 
 module.exports = { handleAuctionCommand };

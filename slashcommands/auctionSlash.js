@@ -106,6 +106,19 @@ const auctionCommand = new SlashCommandBuilder()
           .setRequired(true)
           .setAutocomplete(true)
       )
+  )
+// ─── HISTORY ─────────────────────────────────────────────────────────────────────
+  .addSubcommand(sub =>
+    sub
+      .setName('history')
+      .setDescription('Show auctions closed in the last 24 hours')
+      .addStringOption(opt =>
+        opt
+          .setName('game')
+          .setDescription('Select the game')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
   );
 
 module.exports = { auctionCommand };
