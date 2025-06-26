@@ -181,15 +181,40 @@ async function handleDkpRank(interaction, guildId, member, forcedGameKey) {
     });
   }
 
+  // fetch all members in one go
   const userIds = ranking.map(r => r.userId);
   const members = await interaction.guild.members.fetch({ user: userIds });
-  const nameMap = new Map(members.map(m => [m.user.id, m.displayName]));
 
-  const cfgArr      = await getGamesFromCache(guildId);
+  // load game config to get the “user” role IDs
+  const gamesArr = await getGamesFromCache(guildId);
+  const gameCfg  = gamesArr.find(g => g.key === gameKey) || {};
+  const userRoleIds = gameCfg.roles?.user || [];
+
+  // filter out those who left & those without the user role
+  const filtered = ranking.filter(r => {
+    const m = members.get(r.userId);
+    if (!m) return false;                              // left the guild
+    return userRoleIds.some(roleId => m.roles.cache.has(roleId));
+  });
+
+  if (!filtered.length) {
+    return interaction.editReply({
+      embeds: [ createInfoEmbed('No Eligible Users', 'No users currently with access or still in the server.') ]
+    });
+  }
+
+  // build display name map
+  const nameMap = new Map(filtered.map(r => {
+    const m = members.get(r.userId);
+    return [r.userId, m.displayName];
+  }));
+
+  // prepare embedding
+  const cfgArr      = gamesArr;
   const cfg         = cfgArr.find(g => g.key === gameKey) || {};
   const displayName = cfg.name || gameKey;
 
-  const lines = ranking.map((r, idx) => {
+  const lines = filtered.map((r, idx) => {
     const uname = nameMap.get(r.userId) || `<@${r.userId}>`;
     return `${idx + 1}. **${uname}** — ${r.points} points`;
   });
