@@ -34,16 +34,18 @@ async function handleAuctionCommand(interaction) {
   const sub     = interaction.options.getSubcommand();
   const gameKey = interaction.options.getString('game')?.toLowerCase();
 
-  // Load guild config and game context
+  // load config
   const cfg     = await GuildConfig.findOne({ guildId });
   const gameCfg = cfg?.games.find(g => g.key === gameKey);
   if (!gameCfg) {
     return interaction.editReply({ content: 'Game not configured.' });
   }
+
   const channelId = gameCfg.channels.auction;
   if (!channelId) {
     return interaction.editReply({ content: 'Auction channel not configured.' });
   }
+  const currencyName = gameCfg.currency.name;     // <-- currency label
   const channel = await interaction.guild.channels.fetch(channelId);
 
   // Auction duration (minutes)
@@ -59,18 +61,18 @@ async function handleAuctionCommand(interaction) {
     return new EmbedBuilder()
       .setTitle(item.name)
       .addFields(
-        { name: 'Category',       value: item.category.name, inline: true },
-        { name: 'Quantity',       value: String(quantity), inline: true },
-        { name: 'Total DKP Cost', value: String(totalDkpCost), inline: true },
-        { name: 'Starting Price', value: String(totalMinBid), inline: true },
-        { name: 'Bid Increment',  value: String(bidIncrement), inline: true },
-        { name: 'Ends in',        value: `<t:${endTs}:R> (<t:${endTs}:f>)` }
+        { name: 'Category',        value: item.category.name,                             inline: true },
+        { name: 'Quantity',        value: String(quantity),                                inline: true },
+        { name: 'Total DKP Cost',  value: String(totalDkpCost),                            inline: true },
+        { name: `Starting Price`,  value: `${totalMinBid} ${currencyName}`,                 inline: true },
+        { name: `Bid Increment`,   value: `${bidIncrement} ${currencyName}`,                inline: true },
+        { name: 'Ends in',         value: `<t:${endTs}:R> (<t:${endTs}:f>)`                 }
       )
       .setFooter({ text: `Auction ID: ${auction._id}` });
   }
 
   try {
-    // ─── START ───
+    // ─── START ────────────────────────────────────────────────────────────────
     if (sub === 'start') {
       const itemId   = interaction.options.getString('item');
       const quantity = interaction.options.getInteger('quantity');
@@ -97,6 +99,7 @@ async function handleAuctionCommand(interaction) {
         endTimestamp
       });
 
+      // log creation
       await sendMessageToConfiguredChannels(
         interaction,
         `New auction created by **${interaction.member.displayName}**: **${item.name}** x${quantity}`,
@@ -104,9 +107,11 @@ async function handleAuctionCommand(interaction) {
         gameKey
       );
 
+      // announce and thread
       const annMsg = await channel.send(`@here 📢 New auction started: **${item.name}** x${quantity}!`);
       const thread = await annMsg.startThread({ name: `Auction: ${item.name}` });
 
+      // detailed embed with image
       const imagePath = path.join(__dirname, '..', 'img', 'items', item.image);
       const embed     = buildEmbed(auction, item, quantity)
                           .setImage(`attachment://${item.image}`);
@@ -126,25 +131,24 @@ async function handleAuctionCommand(interaction) {
       });
     }
 
-    // ─── EDIT ───
+    // ─── EDIT ────────────────────────────────────────────────────────────────
     if (sub === 'edit') {
-      const auctionId    = interaction.options.getString('auctionid');
-      const newQty       = interaction.options.getInteger('quantity');
-      const rawDuration  = interaction.options.getString('duration');
-
+      const auctionId   = interaction.options.getString('auctionid');
+      const newQty      = interaction.options.getInteger('quantity');
+      const rawDuration = interaction.options.getString('duration');
       if (newQty == null && !rawDuration) {
         return interaction.editReply(
           'You must supply a new **quantity** and/or **duration**.'
         );
       }
 
-      // Fetch & validate auction
+      // fetch auction
       const auction = await Auction.findById(auctionId);
       if (!auction || auction.status !== 'open') {
         return interaction.editReply('Open auction not found for that ID.');
       }
 
-      // Apply changes
+      // apply changes
       const changes = [];
       if (newQty != null) {
         auction.quantity = newQty;
@@ -160,49 +164,39 @@ async function handleAuctionCommand(interaction) {
         auction.endTimestamp = new Date(Date.now() + ms);
         changes.push(`duration → ${rawDuration}`);
 
-        // cancel existing scheduled close if any
+        // cancel old job
         const jobName = `close-auction-${auction._id}`;
-        const existingJob = schedule.scheduledJobs[jobName];
-        if (existingJob) existingJob.cancel();
+        const oldJob = schedule.scheduledJobs[jobName];
+        if (oldJob) oldJob.cancel();
 
-        // schedule with new timestamp
+        // reschedule
         scheduleAuctionClose(auction, interaction.client);
       }
 
       await auction.save();
       await refreshOpenAuctionsCache(guildId, gameKey);
-      if (rawDuration) {
-        scheduleAuctionClose(auction, interaction.client);
-      }
 
-      // **Update the embed inside the existing thread**
+      // update embed in thread
       const items  = await getItemsFromCache(guildId, gameKey);
       const item   = items.find(i => i._id.equals(auction.item));
       const thread = await interaction.client.channels.fetch(auction.threadId);
-
       if (thread?.isThread()) {
-        // 1️⃣ find the original embed message by footer
+        // delete old embed message
         const msgs = await thread.messages.fetch({ limit: 10 });
         const orig = msgs.find(m =>
           m.embeds[0]?.footer?.text?.includes(auction._id.toString())
         );
-
         if (orig) {
-          // 2️⃣ delete that old message (embed + stray attachment)
           await orig.delete().catch(() => null);
-
-          // 3️⃣ build & send new embed with its image attached
+          // send new embed + image
           const imagePath = path.join(__dirname, '..', 'img', 'items', item.image);
           const newEmbed  = buildEmbed(auction, item, auction.quantity)
             .setImage(`attachment://${item.image}`);
-
           await thread.send({
             embeds: [newEmbed],
             files:  [{ attachment: imagePath, name: item.image }]
           });
         }
-
-        // 4️⃣ option- al status update
         await thread.send(`⚙️ Auction updated: ${changes.join(', ')}`);
       }
 
@@ -273,7 +267,7 @@ async function handleAuctionCommand(interaction) {
       const thread = await interaction.client.channels.fetch(auction.threadId).catch(() => null);
       if (thread) {
         const text = winnerBid
-          ? `🏆 The winner is <@${winnerBid.userId}> with **${winnerBid.amount}**`
+          ? `🏆 The winner is <@${winnerBid.userId}> with **${winnerBid.amount}** ${currencyName}`
           : 'No bids were placed.';
         await thread.send(`🔒 Auction ended! ${text}`);
       }

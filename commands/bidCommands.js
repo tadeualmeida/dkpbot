@@ -1,28 +1,28 @@
 // File: commands/bidCommands.js
 const { ChannelType } = require('discord.js');
 const Auction = require('../schema/Auction');
-const Bid = require('../schema/Bid');
-const { enqueueAction } = require('../utils/messageQueue');
+const Bid     = require('../schema/Bid');
+const { enqueueAction }    = require('../utils/messageQueue');
 const { createInfoEmbed, createErrorEmbed } = require('../utils/embeds');
-const { getDkpPointsFromCache } = require('../utils/cacheManagement');
+const { getDkpPointsFromCache, getGamesFromCache } = require('../utils/cacheManagement');
 
-/**
- * Handler for /bid commands
- */
 async function handleBidCommand(interaction) {
   const guildId  = interaction.guild.id;
   const threadId = interaction.channelId;
   const userId   = interaction.user.id;
 
-  // 1️⃣ Only inside a thread
+  // 1) only in thread
   if (![ChannelType.PublicThread, ChannelType.PrivateThread].includes(interaction.channel.type)) {
     return interaction.reply({
-      embeds: [createInfoEmbed('Invalid Context', 'You can only place bids inside an auction thread.')],
+      embeds: [createInfoEmbed(
+        'Invalid Context',
+        'You can only place bids inside an auction thread.'
+      )],
       ephemeral: true
     });
   }
 
-  // 2️⃣ Find the active auction for this thread
+  // 2) find auction
   const auction = await Auction.findOne({
     guildId,
     threadId,
@@ -36,41 +36,37 @@ async function handleBidCommand(interaction) {
     });
   }
 
-  // 2️⃣• DKP sufficiency check
-  // 2.1) total DKP the user has
-  const dkpRecord = await getDkpPointsFromCache(guildId, auction.gameKey, userId);
-  const userDkp   = dkpRecord?.points ?? 0;
+  // 2.1) DKP sufficiency
+  const dkpRec   = await getDkpPointsFromCache(guildId, auction.gameKey, userId);
+  const userDkp  = dkpRec?.points ?? 0;
 
-  // 2.2) DKP already reserved by this user as highest bidder in other open auctions
+  // reserved DKP in other open auctions
   const otherAuctions = await Auction.find({
     guildId,
     gameKey: auction.gameKey,
     status: 'open'
   }).populate({ path: 'item', populate: 'category' });
 
-  let reservedDkp = 0;
-  for (const auc of otherAuctions) {
-    const topBid = await Bid.findOne({ auction: auc._id }).sort({ amount: -1 });
-    if (topBid?.userId === userId) {
-      reservedDkp += auc.quantity * auc.item.category.minimumDkp;
+  let reserved = 0;
+  for (const o of otherAuctions) {
+    const top = await Bid.findOne({ auction: o._id }).sort({ amount: -1 });
+    if (top?.userId === userId) {
+      reserved += o.quantity * o.item.category.minimumDkp;
     }
   }
-
-  // 2.3) DKP needed for *this* auction
-  const neededDkp = auction.quantity * auction.item.category.minimumDkp;
-
-  if (userDkp < reservedDkp + neededDkp) {
+  const needDkp = auction.quantity * auction.item.category.minimumDkp;
+  if (userDkp < reserved + needDkp) {
     return interaction.reply({
       embeds: [createErrorEmbed(
         'Insufficient DKP',
-        `You have **${userDkp}** DKP, but **${reservedDkp + neededDkp}** is required ` +
-        `(including **${reservedDkp}** already reserved).`
+        `You have **${userDkp}** DKP, but **${reserved + needDkp}** is required ` +
+        `(including **${reserved}** already reserved).`
       )],
       ephemeral: true
     });
   }
 
-  // 3️⃣ Calculate minimum allowable bid using bidIncrement
+  // 3) min bid
   const value     = interaction.options.getInteger('value');
   const highest   = await Bid.findOne({ auction: auction._id }).sort({ amount: -1 });
   const increment = auction.item.category.bidIncrement * auction.quantity;
@@ -85,26 +81,30 @@ async function handleBidCommand(interaction) {
     });
   }
 
-  // Keep previous highest bid to notify later
+  // 2.5) fetch currency name
+  const gamesArr    = await getGamesFromCache(guildId);
+  const gameCfg     = gamesArr.find(g => g.key === auction.gameKey);
+  const currencyName = gameCfg.currency.name;
+
   const previousHighest = highest;
 
-  // 4️⃣ Record the new bid 
+  // 4) record bid
   await Bid.create({
     guildId,
     gameKey:  auction.gameKey,
     auction:  auction._id,
     userId,
-    displayName:  interaction.member.displayName,
+    displayName: interaction.member.displayName,
     amount:   value,
     placedAt: new Date()
   });
 
-  // 5️⃣ Announce in the auction thread
+  // 5) announce in thread with currency
   await interaction.channel.send(
-    `💰 <@${userId}> placed a bid of **${value}**!`
+    `💰 <@${userId}> placed a bid of **${value}** ${currencyName}!`
   );
 
-  // 6️⃣ Notify the previous highest bidder via messageQueue with an embed
+  // 6) notify outbid user
   if (previousHighest && previousHighest.userId !== userId) {
     const threadLink = `https://discord.com/channels/${guildId}/${threadId}`;
     const dmEmbed = createInfoEmbed(
@@ -114,13 +114,16 @@ async function handleBidCommand(interaction) {
     );
     enqueueAction(async () => {
       const user = await interaction.client.users.fetch(previousHighest.userId);
-      return user.send({ embeds: [dmEmbed] });
+      return user?.send({ embeds: [dmEmbed] });
     });
   }
 
-  // 7️⃣ Acknowledge to the bidder
+  // 7) ack
   return interaction.reply({
-    embeds: [createInfoEmbed('Bid Placed', `Your bid of **${value}** has been placed!`)],
+    embeds: [createInfoEmbed(
+      'Bid Placed',
+      `Your bid of **${value}** ${currencyName} has been placed!`
+    )],
     ephemeral: true
   });
 }

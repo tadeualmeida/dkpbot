@@ -82,8 +82,9 @@ async function closeAuction(auctionId, client) {
   // announce in thread
   const thread = await client.channels.fetch(auction.threadId).catch(() => null);
   if (thread) {
+    const currencyName = gameCfg.currency.name;
     const text = winnerBid
-      ? `🏆 The winner is <@${winnerBid.userId}> with **${winnerBid.amount}**`
+      ? `🏆 The winner is <@${winnerBid.userId}> with **${winnerBid.amount}** ${currencyName}`
       : 'No bids were placed.';
     await thread.send(`🔒 Auction ended! ${text}`);
   }
@@ -146,7 +147,7 @@ if (gameCfg.channels.log && winnerBid && oldBalance !== null && newBalance !== n
       'Auction Ended',
       `Item: **${auction.item.name}** x${auction.quantity}\n` +
       `Winner: **${displayName}**\n` +
-      `Cost: **${cost}** DKP\n` +
+      `DKP Cost: **${cost}**\n` +
       `Balance: **${oldBalance}** → **${newBalance}** DKP\n\n` +
       `Auction thread: ${threadUrl}`
     );
@@ -175,7 +176,7 @@ function scheduleAuctionClose(auction, client) {
   );
 
   // auto‐delete 6h later
-  const deleteTime = new Date(auction.endTimestamp.getTime() + 8 * 60 * 60 * 1000);
+  const deleteTime = new Date(auction.endTimestamp.getTime() + 2 * 60 * 1000);
   schedule.scheduleJob(
     `delete-auction-${auction._id}`,
     deleteTime,
@@ -200,13 +201,13 @@ async function initAuctionScheduler(client) {
     scheduleAuctionClose(auc, client);
   }
 
-  // closed auctions → delete if due or schedule later 
+  // closed auctions → delete if due or schedule later
   const closedAuctions = await Auction.find({
     status:       'closed',
     endTimestamp: { $lte: now }
   });
   for (const auc of closedAuctions) {
-    const deleteTime = new Date(auc.endTimestamp.getTime() + 8 * 60 * 60 * 1000);
+    const deleteTime = new Date(auc.endTimestamp.getTime() + 2 * 60 * 1000);
     if (deleteTime <= now) {
       await deleteAnnouncementAndThread(auc._id, client);
     } else {

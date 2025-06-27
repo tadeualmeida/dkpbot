@@ -62,7 +62,7 @@ async function handleAutocomplete(interaction) {
   // ---- generic game autocomplete ----
   if (
     focusedName === 'game' &&
-    ['dkp','rank','dkpadd','dkpremove','bank','config','event','currency','reminder','reset','rankreport', 'transactions']
+    ['dkp','rank','dkpadd','dkpremove','bank','event','currency','reminder','reset','rankreport','transactions']
       .includes(cmd)
   ) {
     return suggestGames(interaction, guildId, search);
