@@ -27,6 +27,12 @@ const GameConfigSchema = new Schema({
     auction:  { type: String, default: null },
     reminder: { type: String, default: null }
   },
+  // how bids are paid: “game” = use game.currency, “dkp” = use users’ DKP balance
+  auctionMode: {
+    type: String,
+    enum: ['game','dkp'],
+    default: 'game'
+  },
   // parâmetros de DKP
   dkpParameters: [{
     name:   { type: String, required: true, lowercase: true, trim: true },
@@ -55,7 +61,7 @@ const GameConfigSchema = new Schema({
     // duração padrão (em minutos) para que uma nova auction fique aberta
   defaultAuctionDelete: {
     type: Number,
-    default: 6 * 60,     // 6 horas = 960 minutos
+    default: 8 * 60,     // 8 horas
     min: 1
   },
   totalDkp: {

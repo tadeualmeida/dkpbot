@@ -474,48 +474,72 @@ async function handleConfigCommands(interaction) {
       break;
     }
 
-    // ---- AUCTION TIMER ----
+    // ---- AUCTION CONFIGURATION ----
     case 'auction': {
-      const actionStr   = interaction.options.getString('action');    // só 'timer'
-      const durationStr = interaction.options.getString('duration');
+      const action = interaction.options.getString('action');
+      // for timer and delete we accept a free-form duration string
+      const rawDuration = interaction.options.getString('duration');
+      // for mode we accept a choice
+      const modeChoice  = interaction.options.getString('mode');
 
-      if (actionStr !== 'timer') {
+      if (action === 'timer') {
+        // Set default auction duration (minutes)
+        const ms = parseDuration(rawDuration);
+        if (isNaN(ms) || ms <= 0) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Could not parse duration. Use `10h30m`, `45m`, `2h`, etc.') ],
+            ephemeral: true
+          });
+        }
+        const minutes = Math.floor(ms / 60000);
+        gameCfg.defaultAuctionDuration = minutes;
+        await sendMessageToConfiguredChannels(
+          interaction,
+          `🔧 Auction timer for **${gameCfg.name}** updated to **${rawDuration}** (${minutes}m).`,
+          'auction',
+          gameKey
+        );
+        
+      } else if (action === 'delete') {
+        // Set default auction delete delay (minutes)
+        const ms = parseDuration(rawDuration);
+        if (isNaN(ms) || ms <= 0) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Could not parse delete duration. Use `10h30m`, `45m`, `2h`, etc.') ],
+            ephemeral: true
+          });
+        }
+        const minutes = Math.floor(ms / 60000);
+        gameCfg.defaultAuctionDelete = minutes;
+        await sendMessageToConfiguredChannels(
+          interaction,
+          `🔧 Auction delete timer for **${gameCfg.name}** updated to **${minutes}** minutes.`,
+          'auction',
+          gameKey
+        );
+
+      } else if (action === 'mode') {
+        // Set auction mode: 'currency' or 'dkp'
+        if (!['currency', 'dkp'].includes(modeChoice)) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Invalid mode. Choose either `currency` or `dkp`.') ],
+            ephemeral: true
+          });
+        }
+        gameCfg.auctionMode = modeChoice;
+        await sendMessageToConfiguredChannels(
+          interaction,
+          `🔧 Auction mode for **${gameCfg.name}** defined as **${modeChoice}**.`,
+          'auction',
+          gameKey
+        );
+
+      } else {
         return interaction.reply({
-          embeds: [ createErrorEmbed('Invalid auction action.') ],
+          embeds: [ createErrorEmbed('Unknown auction action.') ],
           ephemeral: true
         });
       }
-
-      const ms = parseDuration(durationStr);
-      if (isNaN(ms) || ms <= 0) {
-        return interaction.reply({
-          embeds: [ createErrorEmbed(
-            'Invalid Duration',
-            `Could not parse duration **${durationStr}**. Use formats como \`1h30m\`, \`90m\`, \`2h\`.`
-          ) ],
-          ephemeral: true
-        });
-      }
-
-      const minutes = Math.floor(ms / 60_000);
-      if (minutes <= 0) {
-        return interaction.reply({
-          embeds: [ createErrorEmbed(
-            'Duration Too Short',
-            `Após parsing, a duração precisa ser pelo menos 1 minuto.`
-          ) ],
-          ephemeral: true
-        });
-      }
-
-      gameCfg.defaultAuctionDuration = minutes;
-
-      await sendMessageToConfiguredChannels(
-        interaction,
-        `🔧 Auction timer para **${gameCfg.name}** atualizado para **${durationStr}** (${minutes} minutos).`,
-        'event',
-        gameKey
-      );
       break;
     }
 

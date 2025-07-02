@@ -203,7 +203,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // Auction timer settings
+  // Auction settings (timer, delete, mode)
   .addSubcommand(sub =>
     sub
       .setName('auction')
@@ -221,14 +221,26 @@ const configCommand = new SlashCommandBuilder()
           .setDescription('Choose an action')
           .setRequired(true)
           .addChoices(
-            { name: 'Set Auction Timer', value: 'timer' }
+            { name: 'Set Auction Timer',       value: 'timer' },
+            { name: 'Set Auction Delete Time', value: 'delete' },
+            { name: 'Set Auction Mode',        value: 'mode' }
           )
       )
       .addStringOption(opt =>
         opt
           .setName('duration')
-          .setDescription('Duration (e.g. "1h30m", "90m", "2h")')
-          .setRequired(true)
+          .setDescription('Duration for timer or delete (e.g. "1h30m", "90m")')
+          .setRequired(false)
+      )
+      .addStringOption(opt =>
+        opt
+          .setName('mode')
+          .setDescription('Which currency mode to use for auctions')
+          .setRequired(false)
+          .addChoices(
+            { name: 'Game Currency', value: 'currency' },
+            { name: 'Use DKP as Currency', value: 'dkp' }
+          )
       )
   )
 
