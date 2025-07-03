@@ -57,8 +57,8 @@ async function handleAuctionCommand(interaction) {
       ? item.category.minimumDkp
       : item.category.minimumCurrency) * qty;
     const incrVal      = (useDkp
-      ? item.category.minimumDkp
-      : item.category.bidIncrement) * qty;
+      ? item.category.bidIncrement
+      : item.category.minimumDkp) * qty;
     const endTs        = Math.floor(auction.endTimestamp.getTime() / 1000);
 
     const fields = [
@@ -319,6 +319,49 @@ async function handleAuctionCommand(interaction) {
       return interaction.editReply(
         'Auction ended, history recorded and DKP updated.'
       );
+    }
+
+    // ─── CANCEL ───────────────────────────────────────────────────────────────────
+    if (sub === 'cancel') {
+      const auctionId = interaction.options.getString('auctionid');
+      const auction   = await Auction.findOne({ _id: auctionId, gameKey });
+      if (!auction || auction.status !== 'open') {
+        return interaction.editReply({ content: 'Open auction not found for that ID.' });
+      }
+
+      // Delete announcement message
+      if (auction.announcementMessageId) {
+        const annMsg = await channel.messages
+          .fetch(auction.announcementMessageId)
+          .catch(() => null);
+        if (annMsg) {
+          await annMsg.delete().catch(() => null);
+        }
+      }
+
+      // Delete the thread
+      const thread = await interaction.client.channels.fetch(auction.threadId).catch(() => null);
+      if (thread) {
+        await thread.delete().catch(() => null);
+      }
+
+      // Remove auction entirely
+      await Auction.deleteOne({ _id: auctionId });
+
+      // Refresh cache
+      await refreshOpenAuctionsCache(guildId, gameKey);
+
+      // Log cancellation
+      await sendMessageToConfiguredChannels(
+        interaction,
+        `Auction **${auctionId}** cancelled by **${interaction.member.displayName}**.`,
+        'log',
+        gameKey
+      );
+
+      return interaction.editReply({
+        content: `Auction **${auctionId}** has been cancelled and removed.`
+      });
     }
 
     // ─── HISTORY ───────────────────────────────────────────────────────────────

@@ -326,10 +326,10 @@ async function handleConfigCommands(interaction) {
           }
           const itemDoc = await Item.findOneAndDelete({ guildId, gameKey, _id: itemName });
           if (!itemDoc) {
-            return interaction.reply({ content: `Item **${itemName}** não encontrado.`, ephemeral: true });
+            return interaction.reply({ content: `Item **${itemName}** not found.`, ephemeral: true });
           }
           return interaction.reply({
-            content: `Item **${itemName}** removido com sucesso.`,
+            content: `Item **${itemName}** successfully removed.`,
             ephemeral: true
           });
     }
@@ -337,12 +337,12 @@ async function handleConfigCommands(interaction) {
           const items = await Item.find({ guildId, gameKey }).populate('category', 'name').lean();
           if (!items.length) {
             return interaction.reply({
-              embeds: [ createInfoEmbed('Items', 'Nenhum item cadastrado.') ],
+              embeds: [ createInfoEmbed('Items', 'No items registered.') ],
               ephemeral: true
             });
           }
           const lines = items.map(i =>
-            `• **${i.name}** – Categoria: **${i.category.name}**`
+            `• **${i.name}** – Category: **${i.category.name}**`
           );
           return interaction.reply({
             embeds: [ createMultipleResultsEmbed('info', 'Itens', lines) ],
