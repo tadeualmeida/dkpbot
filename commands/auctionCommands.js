@@ -120,7 +120,7 @@ async function handleAuctionCommand(interaction) {
         'log',
         gameKey
       );
-      const ann = await channel.send(`📢 New auction: **${item.name}** x${quantity}!`);
+      const ann = await channel.send(`@here 📢 New auction: **${item.name}** x${quantity}!`);
       const thread = await ann.startThread({ name: `Auction: ${item.name}` });
 
       // Resize image
