@@ -78,7 +78,11 @@ async function handleAuctionCommand(interaction) {
       { name: 'Starting Price', value: `${startVal} ${currencyLabel}`, inline: true },
       { name: 'Bid Increment',  value: `${incrVal} ${currencyLabel}`,  inline: true },
       { name: 'Ends in',        value: `<t:${endTs}:R> (<t:${endTs}:f>)` }
-    );
+    )
+    
+    if (auction.location) {
+    fields.push({ name: 'Location', value: auction.location, inline: true });
+    };
 
     return new EmbedBuilder()
       .setTitle(item.name)
@@ -91,6 +95,7 @@ async function handleAuctionCommand(interaction) {
     if (sub === 'start') {
       const itemId   = interaction.options.getString('item');
       const quantity = interaction.options.getInteger('quantity');
+      const location = interaction.options.getString('location');
       if (quantity < 1) return interaction.editReply('Quantity must be at least 1.');
 
       const items = await getItemsFromCache(guildId, gameKey);
@@ -127,11 +132,17 @@ async function handleAuctionCommand(interaction) {
       const imgPath = path.join(__dirname, '..', 'img', 'items', item.image);
       let buf = fs.readFileSync(imgPath);
       buf = await sharp(buf)
-        .resize({ width: 390, height: 530, fit: 'inside' })
+        .resize({ width: 390, height: 520, fit: 'inside' })
         .toBuffer();
 
       const embed = buildEmbed(auction, item, quantity)
         .setImage(`attachment://${item.image}`);
+
+      // Add Location field if provided
+      if (location) {
+        embed.addFields({ name: 'Item Location', value: location, inline: true });
+      }
+
       await thread.send({
         embeds: [embed],
         files:  [{ attachment: buf, name: item.image }]
@@ -153,9 +164,10 @@ async function handleAuctionCommand(interaction) {
       const auctionId   = interaction.options.getString('auctionid');
       const newQty      = interaction.options.getInteger('quantity');
       const rawDur      = interaction.options.getString('duration');
+      const newLoc      = interaction.options.getString('location'); // <-- added
 
-      if (newQty == null && !rawDur) {
-        return interaction.editReply('Provide new **quantity** and/or **duration**.');
+      if (newQty == null && !rawDur && !newLoc) {
+        return interaction.editReply('Provide new **quantity**, **duration**, and/or **location**.');
       }
 
       const auction = await Auction.findById(auctionId);
@@ -170,7 +182,7 @@ async function handleAuctionCommand(interaction) {
       }
       if (rawDur) {
         const ms = parseDuration(rawDur);
-        if (isNaN(ms) || ms<=0) {
+        if (isNaN(ms) || ms <= 0) {
           return interaction.editReply('Invalid duration; use formats like `1h30m`, `45m`.');
         }
         auction.endTimestamp = new Date(Date.now() + ms);
@@ -178,24 +190,41 @@ async function handleAuctionCommand(interaction) {
         cancelAuctionSchedule(auctionId);
         scheduleAuctionClose(auction, interaction.client);
       }
+      if (newLoc) {
+        auction.location = newLoc;
+        changes.push(`location → ${newLoc}`);  // track the change
+      }
 
       await auction.save();
       await refreshOpenAuctionsCache(guildId, gameKey);
 
-      // Refresh embed in thread (delete old, post new)
-      const items = await getItemsFromCache(guildId, gameKey);
-      const item  = items.find(i => i._id.equals(auction.item));
+      // Refresh embed in thread: delete old embed, send new one with updated fields
+      const items  = await getItemsFromCache(guildId, gameKey);
+      const item   = items.find(i => i._id.equals(auction.item));
       const thread = await interaction.client.channels.fetch(auction.threadId).catch(()=>null);
+
       if (thread?.isThread()) {
+        // remove the old embed message
         const msgs = await thread.messages.fetch({ limit: 10 });
         const orig = msgs.find(m => m.embeds[0]?.footer?.text?.includes(auction._id.toString()));
-        if (orig) await orig.delete().catch(()=>null);
+        if (orig) await orig.delete().catch(() => null);
 
-        let buf = fs.readFileSync(path.join(__dirname,'..','img','items',item.image));
-        buf = await sharp(buf).resize({ width:390, height:530, fit:'inside' }).toBuffer();
+        // resize image
+        let buf = fs.readFileSync(path.join(__dirname, '..', 'img', 'items', item.image));
+        buf = await sharp(buf)
+          .resize({ width: 390, height: 520, fit: 'inside' })
+          .toBuffer();
+
+        // build & send the updated embed (buildEmbed now includes location if set)
         const newEmbed = buildEmbed(auction, item, auction.quantity)
           .setImage(`attachment://${item.image}`);
-        await thread.send({ embeds:[newEmbed], files:[{attachment:buf,name:item.image}] });
+
+        await thread.send({
+          embeds: [newEmbed],
+          files:  [{ attachment: buf, name: item.image }]
+        });
+
+        // notify of the applied changes
         await thread.send(`⚙️ Auction updated: ${changes.join(', ')}`);
       }
 

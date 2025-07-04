@@ -31,6 +31,12 @@ const auctionCommand = new SlashCommandBuilder()
           .setDescription('Number of items available in this auction')
           .setRequired(true)
       )
+      .addStringOption(opt =>
+        opt
+          .setName('location')
+          .setDescription('The location where the item is (optional)')
+          .setRequired(false)
+)
   )
 
 // ─── EDIT ───────────────────────────────────────────────────────────────────────
@@ -62,6 +68,13 @@ const auctionCommand = new SlashCommandBuilder()
         opt
           .setName('duration')
           .setDescription('New duration (e.g. 10h30m, 2h, 45m). Optional')
+          .setRequired(false)
+      )
+
+      .addStringOption(opt =>
+        opt
+          .setName('location')
+          .setDescription('New location of the item')
           .setRequired(false)
       )
   )
