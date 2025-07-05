@@ -476,14 +476,12 @@ async function handleConfigCommands(interaction) {
 
     // ---- AUCTION CONFIGURATION ----
     case 'auction': {
-      const action = interaction.options.getString('action');
-      // for timer and delete we accept a free-form duration string
-      const rawDuration = interaction.options.getString('duration');
-      // for mode we accept a choice
-      const modeChoice  = interaction.options.getString('mode');
+      const action      = interaction.options.getString('action');    // 'timer', 'delete', 'mode' or 'extend'
+      const rawDuration = interaction.options.getString('duration');  // for timer, delete, extend
+      const modeChoice  = interaction.options.getString('mode');      // for mode
 
       if (action === 'timer') {
-        // Set default auction duration (minutes)
+        // Set default auction duration
         const ms = parseDuration(rawDuration);
         if (isNaN(ms) || ms <= 0) {
           return interaction.reply({
@@ -499,9 +497,9 @@ async function handleConfigCommands(interaction) {
           'auction',
           gameKey
         );
-        
+
       } else if (action === 'delete') {
-        // Set default auction delete delay (minutes)
+        // Set default auction delete delay
         const ms = parseDuration(rawDuration);
         if (isNaN(ms) || ms <= 0) {
           return interaction.reply({
@@ -513,14 +511,14 @@ async function handleConfigCommands(interaction) {
         gameCfg.defaultAuctionDelete = minutes;
         await sendMessageToConfiguredChannels(
           interaction,
-          `🔧 Auction delete timer for **${gameCfg.name}** updated to **${minutes}** minutes.`,
+          `🔧 Auction delete timer for **${gameCfg.name}** updated to **${rawDuration}** (${minutes}m).`,
           'auction',
           gameKey
         );
 
       } else if (action === 'mode') {
         // Set auction mode: 'currency' or 'dkp'
-        if (!['currency', 'dkp'].includes(modeChoice)) {
+        if (!['currency','dkp'].includes(modeChoice)) {
           return interaction.reply({
             embeds: [ createErrorEmbed('Invalid mode. Choose either `currency` or `dkp`.') ],
             ephemeral: true
@@ -529,7 +527,25 @@ async function handleConfigCommands(interaction) {
         gameCfg.auctionMode = modeChoice;
         await sendMessageToConfiguredChannels(
           interaction,
-          `🔧 Auction mode for **${gameCfg.name}** defined as **${modeChoice}**.`,
+          `🔧 Auction mode for **${gameCfg.name}** set to **${modeChoice}**.`,
+          'auction',
+          gameKey
+        );
+
+      } else if (action === 'extend') {
+        // Set auction bid extension duration
+        const ms = parseDuration(rawDuration);
+        if (isNaN(ms) || ms <= 0) {
+          return interaction.reply({
+            embeds: [ createErrorEmbed('Could not parse extend duration. Use `10m`, `2h`, `1h30m`, etc.') ],
+            ephemeral: true
+          });
+        }
+        const minutes = Math.floor(ms / 60000);
+        gameCfg.AuctionBidExtend = minutes;
+        await sendMessageToConfiguredChannels(
+          interaction,
+          `🔧 Auction bid extension for **${gameCfg.name}** updated to **${rawDuration}** (${minutes}m).`,
           'auction',
           gameKey
         );
@@ -540,6 +556,7 @@ async function handleConfigCommands(interaction) {
           ephemeral: true
         });
       }
+
       break;
     }
 

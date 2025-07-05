@@ -64,6 +64,11 @@ const GameConfigSchema = new Schema({
     default: 8 * 60,     // 8 horas
     min: 1
   },
+  AuctionBidExtend: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   totalDkp: {
     type: Number,
     default: 0,

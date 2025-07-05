@@ -54,10 +54,10 @@ const configCommand = new SlashCommandBuilder()
           .setDescription('Choose an action')
           .setRequired(true)
           .addChoices(
-            { name: 'Add Parameter',     value: 'add' },
-            { name: 'Remove Parameter',  value: 'remove' },
-            { name: 'Edit Parameter',    value: 'edit' },
-            { name: 'Set Minimum Points',value: 'minimum' }
+            { name: 'Add Parameter',      value: 'add' },
+            { name: 'Remove Parameter',   value: 'remove' },
+            { name: 'Edit Parameter',     value: 'edit' },
+            { name: 'Set Minimum Points', value: 'minimum' }
           )
       )
       .addStringOption(opt =>
@@ -75,7 +75,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // Channels configuration (inclui agora “auction”)
+  // Channels configuration
   .addSubcommand(sub =>
     sub
       .setName('channel')
@@ -203,7 +203,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // Auction settings (timer, delete, mode)
+  // Auction settings (timer, delete, mode, extend)
   .addSubcommand(sub =>
     sub
       .setName('auction')
@@ -221,15 +221,16 @@ const configCommand = new SlashCommandBuilder()
           .setDescription('Choose an action')
           .setRequired(true)
           .addChoices(
-            { name: 'Set Auction Timer',       value: 'timer' },
-            { name: 'Set Auction Delete Time', value: 'delete' },
-            { name: 'Set Auction Mode',        value: 'mode' }
+            { name: 'Set Auction Timer',             value: 'timer' },
+            { name: 'Set Auction Delete Time',       value: 'delete' },
+            { name: 'Set Auction Mode',              value: 'mode' },
+            { name: 'Set Auction Bid Extend Time',   value: 'extend' }
           )
       )
       .addStringOption(opt =>
         opt
           .setName('duration')
-          .setDescription('Duration for timer or delete (e.g. "1h30m", "90m")')
+          .setDescription('Duration for timer, delete or bid‐extend (e.g. "1h30m", "90m")')
           .setRequired(false)
       )
       .addStringOption(opt =>
@@ -238,7 +239,7 @@ const configCommand = new SlashCommandBuilder()
           .setDescription('Which currency mode to use for auctions')
           .setRequired(false)
           .addChoices(
-            { name: 'Game Currency', value: 'currency' },
+            { name: 'Game Currency',       value: 'currency' },
             { name: 'Use DKP as Currency', value: 'dkp' }
           )
       )
@@ -293,7 +294,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-    // ---- CATEGORY CONFIGURATION ----
+  // Category configuration
   .addSubcommand(sub =>
     sub
       .setName('category')
@@ -333,7 +334,7 @@ const configCommand = new SlashCommandBuilder()
       .addIntegerOption(opt =>
         opt
           .setName('minimumcurrency')
-          .setDescription('Minimum in-game currency required to bid in this category')
+          .setDescription('Minimum in‐game currency required to bid in this category')
           .setRequired(false)
       )
       .addIntegerOption(opt =>
@@ -344,7 +345,7 @@ const configCommand = new SlashCommandBuilder()
       )
   )
 
-  // ---- ITEM CONFIGURATION ----
+  // Item configuration
   .addSubcommand(sub =>
     sub
       .setName('item')
@@ -384,7 +385,7 @@ const configCommand = new SlashCommandBuilder()
       .addStringOption(opt =>
         opt
           .setName('image')
-          .setDescription('Image filename (autocomplete da pasta /img/itens/)')
+          .setDescription('Image filename (autocomplete from /img/items/)')
           .setRequired(false)
           .setAutocomplete(true)
       )
